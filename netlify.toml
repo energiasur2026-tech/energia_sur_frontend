@@ -1,0 +1,27 @@
+# Configuración de despliegue en Netlify.
+#
+# Está acá, versionada, y no solo en el panel de Netlify, para que el
+# despliegue sea reproducible: cualquiera que clone el repo y lo conecte a un
+# sitio nuevo obtiene la misma configuración sin tener que acordarse de
+# tildar nada a mano.
+#
+# Lo decisivo es el plugin: sin él, Netlify publica la carpeta `.next` como si
+# fueran archivos estáticos. Las pantallas quedarían servidas como HTML suelto
+# y el rewrite de `/api/*` hacia el backend no existiría, así que todas las
+# llamadas darían 404 con el build en verde. El plugin es el que crea la
+# función que ejecuta Next.js y resuelve ese rewrite.
+#
+# A diferencia del backend, acá no hay sección [functions]: el recolector
+# programado vive en el otro repo y este no tiene funciones propias.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # En local se usó Node v24.18.0. Fijarla evita que un cambio del default de
+  # Netlify rompa el build más adelante.
+  NODE_VERSION = "24"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

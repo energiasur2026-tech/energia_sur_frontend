@@ -1,0 +1,252 @@
+@import "tailwindcss";
+
+/**
+ * Dos paletas: clara y oscura.
+ *
+ * El tema vive en `data-theme` sobre <html>, con tres estados:
+ *   ausente  -> sigue al sistema operativo
+ *   "light"  -> claro forzado
+ *   "dark"   -> oscuro forzado
+ *
+ * Los componentes no conocen los colores: usan las utilidades de Tailwind
+ * (bg-surface, text-muted, ...) que `@theme inline` ata a estas variables.
+ * Cambiar de tema es entonces redefinir variables, no tocar componentes.
+ */
+
+/* --- Claro (base) --- */
+:root {
+  --background: #f4f6f9;
+  --surface: #ffffff;
+  --surface-raised: #eef2f7;
+  --border: #d8e0ea;
+  --foreground: #16202b;
+  --muted: #5b6b7d;
+  --accent: #1e6fd9;
+  --accent-soft: #dbeafe;
+  --ok: #15803d;
+  --warn: #b45309;
+  --danger: #c0392b;
+
+  /* Los gráficos necesitan valores concretos: Recharts los recibe como
+     atributos SVG, no como clases. */
+  --chart-grid: #dbe3ec;
+  --chart-axis: #5b6b7d;
+  --chart-tooltip-bg: #ffffff;
+  --chart-power: #1e6fd9;
+  --chart-voltage: #15803d;
+}
+
+/* --- Oscuro --- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0b1017;
+    --surface: #131b26;
+    --surface-raised: #1a2431;
+    --border: #263243;
+    --foreground: #e8eef6;
+    --muted: #8ea0b5;
+    --accent: #3b8ef0;
+    --accent-soft: #1d3a5f;
+    --ok: #35c48b;
+    --warn: #f0a63b;
+    --danger: #e05b5b;
+
+    --chart-grid: #263243;
+    --chart-axis: #8ea0b5;
+    --chart-tooltip-bg: #1a2431;
+    --chart-power: #3b8ef0;
+    --chart-voltage: #35c48b;
+  }
+}
+
+/* La elección explícita gana sobre el sistema, en los dos sentidos. */
+:root[data-theme="dark"] {
+  --background: #0b1017;
+  --surface: #131b26;
+  --surface-raised: #1a2431;
+  --border: #263243;
+  --foreground: #e8eef6;
+  --muted: #8ea0b5;
+  --accent: #3b8ef0;
+  --accent-soft: #1d3a5f;
+  --ok: #35c48b;
+  --warn: #f0a63b;
+  --danger: #e05b5b;
+
+  --chart-grid: #263243;
+  --chart-axis: #8ea0b5;
+  --chart-tooltip-bg: #1a2431;
+  --chart-power: #3b8ef0;
+  --chart-voltage: #35c48b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-soft: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* La barra inferior de navegación en mobile es fija: el contenido reserva su
+   alto para que nada quede tapado detrás, incluido el área segura de iOS. */
+@media (max-width: 767px) {
+  .pb-nav {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+
+  /* Una barra `sticky` se ancla al borde del viewport, donde en celular esta
+     la barra de navegacion fija: sin este desplazamiento queda tapada por
+     ella. `pb-nav` no alcanza, porque ese relleno corre el CONTENIDO pero no
+     el punto al que se pega un elemento sticky. */
+  .sticky-above-nav {
+    bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+/**
+ * Pantalla de carga inicial.
+ *
+ * Deliberadamente NO usa React: se renderiza en el HTML del servidor y se
+ * oculta cuando un script mínimo en el <head> marca <html> como cargada. Si
+ * dependiera de React, un fallo al descargar el JavaScript dejaría el loader
+ * tapando la aplicación para siempre — que es exactamente lo que pasa cuando
+ * la conexión es mala, o sea justo el caso que este loader debía cubrir.
+ */
+#app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: var(--background);
+  transition: opacity 320ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 320ms;
+}
+
+html.app-loaded #app-loader {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@keyframes energia-pulse {
+  0%, 100% { transform: scale(0.92); opacity: 0.55; }
+  50%      { transform: scale(1);    opacity: 1; }
+}
+
+.animate-energia-pulse {
+  animation: energia-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-energia-pulse { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Entrada de seccion y de datos.
+
+   Va en CSS y no con framer-motion a proposito. La version con `motion.div`
+   quedaba clavada en su estado inicial (`opacity: 0`) al navegar: el enrutador
+   de Next monta la vista dentro de una transicion de React, y el efecto que
+   dispara la animacion no llegaba a correr, asi que la seccion entera quedaba
+   invisible. Una animacion CSS no puede trabarse: si el elemento se monta, el
+   navegador la corre, sin JavaScript de por medio.
+--------------------------------------------------------------------------- */
+
+@keyframes section-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-section-in {
+  animation: section-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes value-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+  to   { opacity: 1; transform: none;            filter: blur(0); }
+}
+
+.animate-value-in {
+  animation: value-in 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-section-in,
+  .animate-value-in { animation: none; }
+}
+
+/* Entrada de un bloque que aparece cuando termina de cargar (una lista de
+   eventos, un panel de resultados). Sin desenfoque: sobre superficies grandes
+   cuesta caro de dibujar y no aporta nada. */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-fade-in {
+  animation: fade-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Campos de formulario en celular.
+
+   Safari en iOS amplia la pantalla al enfocar un campo cuya letra mide menos
+   de 16 px, y al salir NO la devuelve a su lugar: queda ampliada y hay que
+   corregirla a mano con los dedos. Se notaba sobre todo en los filtros de
+   Eventos, cuyos campos usaban 14 px.
+
+   Se resuelve forzando 16 px en los campos, que es lo que Safari espera. La
+   alternativa —`maximum-scale=1` o `user-scalable=no` en el viewport— desactiva
+   tambien el zoom manual, que es una herramienta de accesibilidad real, y
+   ademas iOS la ignora desde hace varias versiones.
+--------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Campos de fecha.
+
+   Safari en iOS le da a `input[type=date]` una apariencia nativa con un ancho
+   minimo interno propio, que `width: 100%` no alcanza a vencer: el campo se
+   desborda de su contenedor. Sacarle la apariencia nativa lo deja comportarse
+   como un campo normal. No cambia el selector de fecha del sistema, que se
+   sigue abriendo igual al tocarlo.
+--------------------------------------------------------------------------- */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+
+/* Sin esto, Safari centra el texto dentro del campo y queda desalineado
+   respecto del resto de los campos, que alinean a la izquierda. */
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
