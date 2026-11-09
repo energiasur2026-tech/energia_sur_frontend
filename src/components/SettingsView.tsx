@@ -415,10 +415,16 @@ export function SettingsView() {
             text="Define cuán lejos de los 220 V tiene que irse la tensión para que se registre una anomalía. Es un umbral de aviso del producto, no un límite normativo: salir del rango elegido no significa que haya peligro, significa que pediste enterarte."
           />
         </div>
+        {/* El mismo texto que el asistente, palabra por palabra. Si acá
+            dijera otra cosa, serían dos explicaciones distintas de lo mismo
+            para la misma persona. Los rangos no se entienden sin nombrar los
+            220 V: sin esa referencia, "205–235 V" no dice si es amplio o
+            estrecho. */}
         <p className="text-xs text-muted leading-relaxed mb-4">
-          Cuándo querés que te avisemos si la tensión se va de lo normal. A
-          mayor sensibilidad, más angosto el rango que se considera normal, y
-          más avisos.
+          La electricidad llega normalmente a{' '}
+          <b className="text-foreground">220 V</b>: eso es la tensión. Cuando se
+          aleja de ese valor puede dañar aparatos, y te avisamos por email.
+          Elegí cuánto puede alejarse antes de que te avisemos.
         </p>
 
         <div className="space-y-2">
@@ -452,8 +458,12 @@ export function SettingsView() {
                     </span>
                   </span>
                 </span>
-                <span className="text-xs text-muted tabular-nums shrink-0">
-                  {range.lowVoltageV}–{range.highVoltageV} V
+                <span className="text-xs text-muted shrink-0 text-right">
+                  avisa fuera de
+                  <br />
+                  <b className="tabular-nums text-foreground">
+                    {range.lowVoltageV}–{range.highVoltageV} V
+                  </b>
                 </span>
               </label>
             );
