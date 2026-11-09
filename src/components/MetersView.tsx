@@ -2,10 +2,12 @@
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Gauge, House, Layers, Plus, Target, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowRight, Gauge, House, Layers, MapPin, Plus, Target, TriangleAlert, Zap } from 'lucide-react';
 import { formatNumber, formatRelativeMinutes, NO_DATA } from '@/lib/format';
 import type { GoalProgress } from '@/lib/goal';
-import type { HomeSummary } from '@/lib/home-types';
+import type { HomeSummary } from '@/domain/home-types';
+import { PHASE_LABEL, type MeterPhases } from '@/domain/installation-types';
+import { ROLE_LABEL, type MeterRole } from '@/domain/meter-role';
 import type { ApiErrorPayload } from '@/lib/types';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
@@ -21,6 +23,10 @@ type MeterSummary = {
   activeEvents: number;
   goal: GoalProgress;
   home: HomeSummary;
+  role: MeterRole;
+  /** Dónde está instalado, si es de área. `null` en un central. */
+  areaLabel: string | null;
+  phases: MeterPhases;
 };
 
 export function MetersView() {
@@ -103,9 +109,26 @@ function MeterCard({ meter }: { meter: MeterSummary }) {
   return (
     <article className="flex flex-col rounded-2xl border border-border-soft bg-surface p-5">
       <header className="flex items-start justify-between gap-3 mb-4">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-bold tracking-tight">{meter.name}</h2>
-          <p className="text-xs text-muted mt-0.5">
+          {/* Qué mide este medidor. Es una etiqueta suya y nada más: las
+              tarjetas no se suman ni se comparan entre sí. */}
+          <p className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">
+              {meter.role === 'central' ? (
+                <Zap className="h-3 w-3" />
+              ) : (
+                <MapPin className="h-3 w-3" />
+              )}
+              {meter.role === 'central' ? ROLE_LABEL.central : meter.areaLabel || ROLE_LABEL.area}
+            </span>
+            {meter.phases === 3 && (
+              <span className="inline-flex items-center rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">
+                {PHASE_LABEL[3]}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-muted mt-1">
             {meter.latest
               ? `Última medición ${formatRelativeMinutes(meter.latest.recordedAt)}`
               : 'Sin mediciones todavía'}
@@ -186,11 +209,11 @@ function HomeStatus({ home }: { home: HomeSummary }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold leading-tight">
-            {home.configured ? 'Contexto del hogar cargado' : 'Sin componentes del hogar'}
+            {home.configured ? 'Contexto del lugar cargado' : 'Sin contexto cargado'}
           </p>
           <p className={`text-[11px] leading-tight ${home.configured ? 'text-accent' : 'text-muted'}`}>
             {home.configured
-              ? `${home.rooms} ${home.rooms === 1 ? 'ambiente' : 'ambientes'} · ${home.appliances} ${
+              ? `${home.rooms} ${home.rooms === 1 ? 'lugar' : 'lugares'} · ${home.appliances} ${
                   home.appliances === 1 ? 'aparato' : 'aparatos'
                 }`
               : 'Mejora tus recomendaciones y predicciones'}

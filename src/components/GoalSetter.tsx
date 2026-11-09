@@ -4,24 +4,32 @@ import { useState } from 'react';
 import { Target, Trash2 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import type { GoalInputMode, GoalProgress } from '@/lib/goal';
+import type { MeterRole } from '@/domain/meter-role';
 import { InfoTooltip } from './InfoTooltip';
 
 /**
  * Definición de la meta mensual.
  *
- * Se puede escribir en kWh o en pesos porque la gente piensa su factura de las
- * dos maneras. En pesos se convierte con el cuadro tarifario del lado del
- * servidor: acá solo se elige la unidad.
+ * En un medidor central se puede escribir en kWh o en pesos, porque la gente
+ * piensa su factura de las dos maneras. En pesos se convierte con el cuadro
+ * tarifario del lado del servidor: acá solo se elige la unidad.
+ *
+ * En un medidor de área la única unidad es el kWh. Un área no es una factura
+ * aparte —el cargo fijo se paga una vez por instalación— así que "que la
+ * factura no pase de" no significa nada ahí.
  */
 export function GoalSetter({
   goal,
+  role,
   onSaved,
 }: {
   goal: GoalProgress;
+  role: MeterRole;
   onSaved: () => void;
 }) {
+  const isArea = role === 'area';
   const [open, setOpen] = useState(goal.status === 'no_goal');
-  const [mode, setMode] = useState<GoalInputMode>(goal.inputMode);
+  const [mode, setMode] = useState<GoalInputMode>(isArea ? 'kwh' : goal.inputMode);
   const [value, setValue] = useState(() => initialValue(goal));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,7 +69,7 @@ export function GoalSetter({
             <span className="text-sm text-muted">Tu objetivo del mes:</span>
             <strong className="text-sm">
               {formatNumber(goal.goalKwh, 0)} kWh
-              {goal.goalCostArs !== null && (
+              {!isArea && goal.goalCostArs !== null && (
                 <span className="font-normal text-muted"> · ≈ {formatCurrency(goal.goalCostArs)}</span>
               )}
             </strong>
@@ -88,9 +96,9 @@ export function GoalSetter({
         <InfoTooltip title="Tu objetivo mensual" text="Es cuánto querés gastar de luz este mes. Con eso, la app te dice cuánto podés consumir por día y te avisa si te estás pasando, con tiempo para corregir." />
       </div>
       <p className="text-xs text-muted leading-relaxed mb-4">
-        Escribilo como te resulte natural: en pesos, si pensás en la factura, o
-        en kWh si mirás el consumo. Es lo mismo, convertido con el cuadro
-        tarifario.
+        {isArea
+          ? 'El objetivo de un sector se fija en energía: es lo que ese lugar consume, no una factura aparte.'
+          : 'Escribilo como te resulte natural: en pesos, si pensás en la factura, o en kWh si mirás el consumo. Es lo mismo, convertido con el cuadro tarifario.'}
       </p>
 
       {error && (
@@ -99,6 +107,9 @@ export function GoalSetter({
         </p>
       )}
 
+      {/* En un área no hay unidad que elegir: mostrar un selector de una sola
+          opción sería ofrecer una decisión que no existe. */}
+      {!isArea && (
       <div className="flex gap-1 rounded-xl bg-surface-raised p-1 mb-4 w-fit">
         {(['ars', 'kwh'] as GoalInputMode[]).map((option) => (
           <button
@@ -113,6 +124,7 @@ export function GoalSetter({
           </button>
         ))}
       </div>
+      )}
 
       <form
         onSubmit={(event) => {

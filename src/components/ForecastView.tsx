@@ -6,6 +6,7 @@ import { formatCurrency, formatDateTime, formatNumber, NO_DATA } from '@/lib/for
 import type { Forecast, ForecastConfidence } from '@/lib/forecast';
 import type { GoalProgress } from '@/lib/goal';
 import type { Recommendation } from '@/lib/recommendations';
+import type { MeterRole } from '@/domain/meter-role';
 import { GoalPanel, type MonthDailyPoint } from './GoalPanel';
 import { GoalSetter } from './GoalSetter';
 import type { ApiErrorPayload } from '@/lib/types';
@@ -20,6 +21,13 @@ import { SetupNotice } from './SetupNotice';
 const POLL_INTERVAL_MS = 300000;
 
 type Payload = {
+  /**
+   * Dónde está instalado el medidor. Viaja en esta respuesta para que la
+   * pantalla sepa cómo presentarse sin pedir los ajustes por separado.
+   */
+  role: MeterRole;
+  /** `false` en un área: el costo proyectado no incluye el cargo fijo. */
+  billable: boolean;
   forecast: Forecast;
   profile: ProfilePoint[] | null;
   profileMinDays: number;
@@ -81,6 +89,9 @@ export function ForecastView() {
   if (error?.missingEnv) return <SetupNotice missing={error.missingEnv} />;
 
   const forecast = data?.forecast;
+  // Un área se lee en energía: el costo baja a referencia y el objetivo deja
+  // de poder escribirse en pesos.
+  const isArea = data?.role === 'area';
 
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto">
@@ -101,8 +112,9 @@ export function ForecastView() {
 
       {data && (
         <>
-          <GoalSetter goal={data.goal} onSaved={fetchForecast} />
+          <GoalSetter goal={data.goal} role={data.role} onSaved={fetchForecast} />
           <GoalPanel
+            role={data.role}
             goal={data.goal}
             monthDaily={data.monthDaily}
             recommendations={data.recommendations}
@@ -138,7 +150,9 @@ export function ForecastView() {
 
       {forecast?.available && (
         <div className="animate-fade-in">
-          <section className="grid gap-4 grid-cols-1 sm:grid-cols-2 mb-6">
+          <section
+            className={`grid gap-4 grid-cols-1 mb-6 ${isArea ? '' : 'sm:grid-cols-2'}`}
+          >
             <article className="rounded-2xl border border-border-soft bg-surface p-6">
               <header className="flex items-center gap-2 mb-4">
                 <TrendingUp className="h-4 w-4 text-accent" />
@@ -157,26 +171,45 @@ export function ForecastView() {
               <p className="mt-1 text-xs text-muted">
                 {formatNumber(forecast.dailyAverageKwh, 3)} kWh/día medidos
               </p>
+
+              {/* En un área el costo es una referencia dentro de la tarjeta de
+                  energía, no un número principal al lado. */}
+              {isArea && (
+                <p className="mt-4 flex items-start gap-2 border-t border-border-soft pt-3 text-xs text-muted leading-relaxed">
+                  <Receipt className="h-3.5 w-3.5 mt-0.5 shrink-0 text-ok" />
+                  <span>
+                    Representaría unos{' '}
+                    <b className="text-foreground">{formatCurrency(forecast.cost.total)}</b> de
+                    tu factura.
+                    <InfoTooltip
+                      title="De dónde sale esa referencia"
+                      text="Es el precio por kWh del cuadro tarifario aplicado al consumo proyectado de este sector. No incluye el cargo fijo: ese se paga una vez por instalación, no por área."
+                    />
+                  </span>
+                </p>
+              )}
             </article>
 
-            <article className="rounded-2xl border border-border-soft bg-surface p-6">
-              <header className="flex items-center gap-2 mb-4">
-                <Receipt className="h-4 w-4 text-ok" />
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  Costo estimado de esos 30 días
-                </h3>
-                <InfoTooltip title="Costo estimado de esos 30 días" text="Lo que costaría esa electricidad proyectada, según el cuadro tarifario. Es solo la parte de energía de la factura: no incluye agua, cloaca ni otros conceptos." />
-              </header>
-              <p>
-                <ValueFade
-                  className="text-4xl font-bold tabular-nums tracking-tight"
-                  value={formatCurrency(forecast.cost.total)}
-                />
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                Residencial sin subsidio · no incluye agua ni cloaca
-              </p>
-            </article>
+            {!isArea && (
+              <article className="rounded-2xl border border-border-soft bg-surface p-6">
+                <header className="flex items-center gap-2 mb-4">
+                  <Receipt className="h-4 w-4 text-ok" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Costo estimado de esos 30 días
+                  </h3>
+                  <InfoTooltip title="Costo estimado de esos 30 días" text="Lo que costaría esa electricidad proyectada, según el cuadro tarifario. Es solo la parte de energía de la factura: no incluye agua, cloaca ni otros conceptos." />
+                </header>
+                <p>
+                  <ValueFade
+                    className="text-4xl font-bold tabular-nums tracking-tight"
+                    value={formatCurrency(forecast.cost.total)}
+                  />
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Residencial sin subsidio · no incluye agua ni cloaca
+                </p>
+              </article>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
