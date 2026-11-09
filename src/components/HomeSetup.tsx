@@ -910,9 +910,9 @@ function StepDetail({
             elegir. */}
         <p className="text-xs text-muted leading-relaxed mb-3">
           La electricidad llega normalmente a{' '}
-          <b className="text-foreground">220 V</b>. Cuando se aleja de ese valor
-          puede dañar aparatos, y te avisamos por email. Elegí cuánto puede
-          alejarse antes de que te avisemos.
+          <b className="text-foreground">220 V</b>: eso es la tensión. Cuando se
+          aleja de ese valor puede dañar aparatos, y te avisamos por email.
+          Elegí cuánto puede alejarse antes de que te avisemos.
         </p>
 
         <div className="space-y-2">
