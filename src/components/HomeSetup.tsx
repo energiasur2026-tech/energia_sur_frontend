@@ -40,6 +40,7 @@ import {
 } from '@/domain/home-types';
 import type { MeterThresholds } from '@/lib/threshold-types';
 import type { ApiErrorPayload } from '@/lib/types';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
 import { SetupNotice } from './SetupNotice';
@@ -125,6 +126,8 @@ function stepsFor(def: ContextDefinition | null): Step[] {
 
 export function HomeSetup() {
   const router = useRouter();
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
 
   const [step, setStep] = useState<Step>('ubicacion');
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -146,8 +149,8 @@ export function HomeSetup() {
       // el asistente necesita las dos para armar el borrador: el rol decide
       // qué tipos de lugar se ofrecen.
       const [homeRes, settingsRes] = await Promise.all([
-        fetch('/api/meter/home', { cache: 'no-store' }),
-        fetch('/api/meter/settings', { cache: 'no-store' }),
+        fetch(apiUrl('/api/meter/home', deviceId), { cache: 'no-store' }),
+        fetch(apiUrl('/api/meter/settings', deviceId), { cache: 'no-store' }),
       ]);
       const [homePayload, settingsPayload] = await Promise.all([
         homeRes.json(),
@@ -176,7 +179,7 @@ export function HomeSetup() {
     } catch {
       setError({ error: 'No se pudo contactar al servidor.' });
     }
-  }, []);
+  }, [deviceId]);
 
   // No cambia solo: alcanza con leerlo al entrar. Se usa `usePolling` igual
   // que el resto de las vistas porque agenda la primera corrida en vez de
@@ -299,7 +302,7 @@ export function HomeSetup() {
       // corresponda al rol que el medidor tiene en la base. Si fuera al
       // revés, cambiar de central a área y elegir "garage" en la misma
       // pasada daría un 400.
-      const placement = await fetch('/api/meter/settings', {
+      const placement = await fetch(apiUrl('/api/meter/settings', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -341,7 +344,7 @@ export function HomeSetup() {
             },
           ];
 
-      const response = await fetch('/api/meter/home', {
+      const response = await fetch(apiUrl('/api/meter/home', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

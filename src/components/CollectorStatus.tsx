@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { intervalLabel } from '@/lib/collection-intervals';
 import { formatRelativeMinutes } from '@/lib/format';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
 
@@ -12,17 +13,19 @@ type Status = { lastScheduledAt: string | null; active: boolean; intervalMinutes
 const POLL_INTERVAL_MS = 60000;
 
 export function CollectorStatus() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [status, setStatus] = useState<Status | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/collector-status', { cache: 'no-store' });
+      const response = await fetch(apiUrl('/api/meter/collector-status', deviceId), { cache: 'no-store' });
       if (!response.ok) return;
       setStatus((await response.json()) as Status);
     } catch {
       // Es un indicador informativo; si falla, simplemente no se actualiza.
     }
-  }, []);
+  }, [deviceId]);
 
   usePolling(fetchStatus, POLL_INTERVAL_MS);
 

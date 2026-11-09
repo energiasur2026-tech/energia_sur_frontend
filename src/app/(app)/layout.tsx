@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
+import { MeterGoneBanner } from '@/components/MeterGoneBanner';
 import { PageTransition } from '@/components/PageTransition';
 import { SetupNotice } from '@/components/SetupNotice';
 import { WelcomeDialog } from '@/components/WelcomeDialog';
@@ -30,6 +31,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     // el final del contenido no quede tapado detrás de ella.
     <div className="flex-1 flex flex-col pb-nav">
       <AppNav userEmail={user.email} />
+      <MeterGoneBanner />
       <PageTransition>{children}</PageTransition>
       {/* Va en el layout y no en una pantalla: aparece al entrar a la app, sea
           cual sea la seccion a la que se llegue despues del login. */}

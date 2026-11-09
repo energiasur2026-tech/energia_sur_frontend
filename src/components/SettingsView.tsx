@@ -18,6 +18,7 @@ import {
 } from '@/domain/sensitivity';
 import type { MeterThresholds } from '@/lib/threshold-types';
 import type { ApiErrorPayload } from '@/lib/types';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
 import { ProfileForm } from './ProfileForm';
@@ -41,6 +42,8 @@ type Settings = {
 const POLL_INTERVAL_MS = 300000;
 
 export function SettingsView() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   // La ubicación se edita con un formulario propio: el nombre del área es
@@ -55,7 +58,7 @@ export function SettingsView() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/settings', { cache: 'no-store' });
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), { cache: 'no-store' });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -74,7 +77,7 @@ export function SettingsView() {
     } catch {
       setError({ error: 'No se pudo contactar al servidor.' });
     }
-  }, []);
+  }, [deviceId]);
 
   usePolling(fetchSettings, POLL_INTERVAL_MS);
 
@@ -83,7 +86,7 @@ export function SettingsView() {
     setSettings((current) => (current ? { ...current, alertsEnabled: enabled } : current));
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alertsEnabled: enabled }),
@@ -109,7 +112,7 @@ export function SettingsView() {
     setSavingPlacement(true);
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -146,7 +149,7 @@ export function SettingsView() {
     setSettings((current) => (current ? { ...current, phases } : current));
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phases }),
@@ -185,7 +188,7 @@ export function SettingsView() {
     setSettings((current) => (current ? { ...current, sensitivity } : current));
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sensitivity }),
@@ -222,7 +225,7 @@ export function SettingsView() {
     setSavedAt(null);
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ collectionIntervalMinutes: selected }),

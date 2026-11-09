@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, TriangleAlert } from 'lucide-react';
 import { formatDuration } from '@/lib/format';
 import { EVENT_LABEL, type EventRecord } from '@/lib/event-types';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 
 const POLL_INTERVAL_MS = 60000;
@@ -15,11 +16,13 @@ const POLL_INTERVAL_MS = 60000;
  * Eventos, que es donde está el detalle.
  */
 export function ActiveEventsBanner() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [active, setActive] = useState<EventRecord[]>([]);
 
   const fetchActive = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/events', { cache: 'no-store' });
+      const response = await fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' });
       if (!response.ok) return;
 
       const payload = (await response.json()) as { events: EventRecord[] };
@@ -27,7 +30,7 @@ export function ActiveEventsBanner() {
     } catch {
       // Es un aviso complementario: si falla, el Monitor sigue funcionando.
     }
-  }, []);
+  }, [deviceId]);
 
   usePolling(fetchActive, POLL_INTERVAL_MS);
 

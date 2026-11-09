@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Target, Trash2 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import type { GoalInputMode, GoalProgress } from '@/lib/goal';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import type { MeterRole } from '@/domain/meter-role';
 import { InfoTooltip } from './InfoTooltip';
 
@@ -27,6 +28,8 @@ export function GoalSetter({
   role: MeterRole;
   onSaved: () => void;
 }) {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const isArea = role === 'area';
   const [open, setOpen] = useState(goal.status === 'no_goal');
   const [mode, setMode] = useState<GoalInputMode>(isArea ? 'kwh' : goal.inputMode);
@@ -39,7 +42,7 @@ export function GoalSetter({
     setError(null);
 
     try {
-      const response = await fetch('/api/meter/goal', {
+      const response = await fetch(apiUrl('/api/meter/goal', deviceId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode, value: nextValue }),

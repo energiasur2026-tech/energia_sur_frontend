@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Info, Plug, Receipt } from 'lucide-react';
 import { formatCurrency, formatDateTime, formatNumber, NO_DATA } from '@/lib/format';
 import { DEFAULT_PERIOD, PERIOD_KEYS, type PeriodKey } from '@/lib/periods';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import type { ApiErrorPayload, ConsumptionPayload } from '@/lib/types';
 import { InfoTooltip } from './InfoTooltip';
@@ -21,13 +22,15 @@ const REASON_MESSAGE: Record<string, string> = {
 };
 
 export function ConsumptionView() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PERIOD);
   const [data, setData] = useState<ConsumptionPayload | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
 
   const fetchConsumption = useCallback(async () => {
     try {
-      const response = await fetch(`/api/meter/consumption?period=${period}`, {
+      const response = await fetch(apiUrl(`/api/meter/consumption?period=${period}`, deviceId), {
         cache: 'no-store',
       });
       const payload = await response.json();
@@ -42,7 +45,7 @@ export function ConsumptionView() {
     } catch {
       setError({ error: 'No se pudo contactar al servidor.' });
     }
-  }, [period]);
+  }, [period, deviceId]);
 
   usePolling(fetchConsumption, POLL_INTERVAL_MS);
 

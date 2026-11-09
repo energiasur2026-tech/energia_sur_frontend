@@ -10,6 +10,7 @@ import type { MeterRole } from '@/domain/meter-role';
 import { GoalPanel, type MonthDailyPoint } from './GoalPanel';
 import { GoalSetter } from './GoalSetter';
 import type { ApiErrorPayload } from '@/lib/types';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
 import { ValueFade } from './ValueFade';
@@ -64,12 +65,14 @@ const UNAVAILABLE: Record<string, string> = {
 };
 
 export function ForecastView() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
 
   const fetchForecast = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/forecast', { cache: 'no-store' });
+      const response = await fetch(apiUrl('/api/meter/forecast', deviceId), { cache: 'no-store' });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -82,7 +85,7 @@ export function ForecastView() {
     } catch {
       setError({ error: 'No se pudo contactar al servidor.' });
     }
-  }, []);
+  }, [deviceId]);
 
   usePolling(fetchForecast, POLL_INTERVAL_MS);
 
