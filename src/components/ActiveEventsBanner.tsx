@@ -1,4 +1,5 @@
 'use client';
+import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
@@ -19,7 +20,7 @@ export function ActiveEventsBanner() {
 
   const fetchActive = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/events', { cache: 'no-store' });
+      const response = await meterFetch('/api/meter/events', { cache: 'no-store' });
       if (!response.ok) return;
 
       const payload = (await response.json()) as { events: EventRecord[] };

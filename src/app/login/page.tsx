@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AuthForm } from '@/components/AuthForm';
+import { LegacyRecoveryRedirect } from '@/components/LegacyRecoveryRedirect';
 
 export const metadata: Metadata = {
   title: 'Ingresar',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
-  return <AuthForm mode="login" />;
+  return <><LegacyRecoveryRedirect /><AuthForm mode="login" /></>;
 }

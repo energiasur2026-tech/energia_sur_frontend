@@ -1,4 +1,5 @@
 'use client';
+import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -65,7 +66,7 @@ export function HomeSetup() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/home', { cache: 'no-store' });
+      const response = await meterFetch('/api/meter/home', { cache: 'no-store' });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -149,7 +150,7 @@ export function HomeSetup() {
     setSaving(true);
 
     try {
-      const response = await fetch('/api/meter/home', {
+      const response = await meterFetch('/api/meter/home', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

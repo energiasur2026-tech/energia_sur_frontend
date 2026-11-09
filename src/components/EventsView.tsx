@@ -1,4 +1,5 @@
 'use client';
+import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, CircleAlert, Info, ShieldCheck } from 'lucide-react';
@@ -65,7 +66,7 @@ export function EventsView() {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/events', { cache: 'no-store' });
+      const response = await meterFetch('/api/meter/events', { cache: 'no-store' });
       const payload = await response.json();
 
       if (!response.ok) {

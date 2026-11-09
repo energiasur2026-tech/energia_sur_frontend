@@ -150,10 +150,10 @@ function MeterCard({ meter }: { meter: MeterSummary }) {
         />
       </div>
 
-      <HomeStatus home={meter.home} />
+      <HomeStatus home={meter.home} meterId={meter.deviceId} />
 
       <Link
-        href="/dashboard"
+        href={`/dashboard?meterId=${encodeURIComponent(meter.deviceId)}`}
         className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85"
       >
         Ir a mi medidor
@@ -171,7 +171,7 @@ function MeterCard({ meter }: { meter: MeterSummary }) {
  * —cuantos ambientes y aparatos hay— y el enlace baja a secundario, porque ya
  * no hay nada que reclamarle al usuario.
  */
-function HomeStatus({ home }: { home: HomeSummary }) {
+function HomeStatus({ home, meterId }: { home: HomeSummary; meterId: string }) {
   return (
     <div className="mb-4 space-y-2">
       <div
@@ -202,7 +202,7 @@ function HomeStatus({ home }: { home: HomeSummary }) {
           medidor", que ya es un boton lleno. Dos botones llenos del mismo color
           compiten entre si y ninguno de los dos termina destacando. */}
       <Link
-        href="/medidores/hogar"
+        href={`/medidores/hogar?meterId=${encodeURIComponent(meterId)}`}
         className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
           home.configured
             ? 'bg-surface-raised text-muted hover:text-foreground'

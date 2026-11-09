@@ -59,12 +59,14 @@ export type ApiErrorPayload = {
   missingEnv?: string[];
 };
 
-export type ConsumptionReason = 'insufficient_readings' | 'meter_counter_decreased';
+export type ConsumptionReason = 'insufficient_readings' | 'meter_counter_decreased' | 'billing_date_required';
 
 export type ConsumptionPayload = {
-  period: PeriodKey;
+  period: PeriodKey | 'billing';
+  closedOn?: string | null;
+  partialPeriod?: boolean;
   label: string;
-  from: string;
+  from: string | null;
   to: string;
   samples: number;
   firstAt: string | null;

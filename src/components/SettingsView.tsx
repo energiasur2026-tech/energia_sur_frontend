@@ -1,4 +1,5 @@
 'use client';
+import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useState } from 'react';
 import { Bell, Check, Database, Palette, Save } from 'lucide-react';
@@ -35,7 +36,7 @@ export function SettingsView() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/settings', { cache: 'no-store' });
+      const response = await meterFetch('/api/meter/settings', { cache: 'no-store' });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -60,7 +61,7 @@ export function SettingsView() {
     setSettings((current) => (current ? { ...current, alertsEnabled: enabled } : current));
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await meterFetch('/api/meter/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alertsEnabled: enabled }),
@@ -80,7 +81,7 @@ export function SettingsView() {
     setSavedAt(null);
 
     try {
-      const response = await fetch('/api/meter/settings', {
+      const response = await meterFetch('/api/meter/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ collectionIntervalMinutes: selected }),

@@ -1,4 +1,5 @@
 'use client';
+import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useState } from 'react';
 import { intervalLabel } from '@/lib/collection-intervals';
@@ -16,7 +17,7 @@ export function CollectorStatus() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/collector-status', { cache: 'no-store' });
+      const response = await meterFetch('/api/meter/collector-status', { cache: 'no-store' });
       if (!response.ok) return;
       setStatus((await response.json()) as Status);
     } catch {

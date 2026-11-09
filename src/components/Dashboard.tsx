@@ -1,4 +1,5 @@
 'use client';
+import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useRef, useState } from 'react';
 import { Activity, Eye, EyeOff, Gauge, Plug, RefreshCw, Target, TriangleAlert, Zap } from 'lucide-react';
@@ -35,7 +36,7 @@ export function Dashboard() {
   const [live, setLive] = useState<LiveReading | null>(null);
   const [history, setHistory] = useState<HistoryPayload | null>(null);
   const [range, setRange] = useState<RangeKey>(DEFAULT_RANGE);
-  const [metric, setMetric] = useState<'power' | 'voltage'>('power');
+  const [metric, setMetric] = useState<'power' | 'voltage'>('voltage');
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<Context>({
@@ -51,7 +52,7 @@ export function Dashboard() {
 
   const fetchLive = useCallback(async () => {
     try {
-      const response = await fetch('/api/meter/live', { cache: 'no-store' });
+      const response = await meterFetch('/api/meter/live', { cache: 'no-store' });
       const payload = await response.json();
 
       if (!response.ok) {
@@ -73,7 +74,7 @@ export function Dashboard() {
     lastHistoryRequest.current = requestId;
 
     try {
-      const response = await fetch(`/api/meter/history?range=${key}`, { cache: 'no-store' });
+      const response = await meterFetch(`/api/meter/history?range=${key}`, { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok) return;
       // Descarta la respuesta si mientras tanto se pidió otro rango.
@@ -92,8 +93,8 @@ export function Dashboard() {
   const fetchContext = useCallback(async () => {
     try {
       const [forecastResponse, eventsResponse] = await Promise.all([
-        fetch('/api/meter/forecast', { cache: 'no-store' }),
-        fetch('/api/meter/events', { cache: 'no-store' }),
+        meterFetch('/api/meter/forecast', { cache: 'no-store' }),
+        meterFetch('/api/meter/events', { cache: 'no-store' }),
       ]);
 
       if (!forecastResponse.ok || !eventsResponse.ok) return;
@@ -222,11 +223,11 @@ export function Dashboard() {
       <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
           <div className="flex gap-1 rounded-xl bg-surface-raised p-1">
-            <Toggle active={metric === 'power'} onClick={() => setMetric('power')}>
-              Potencia
-            </Toggle>
             <Toggle active={metric === 'voltage'} onClick={() => setMetric('voltage')}>
               Tensión
+            </Toggle>
+            <Toggle active={metric === 'power'} onClick={() => setMetric('power')}>
+              Potencia
             </Toggle>
           </div>
 

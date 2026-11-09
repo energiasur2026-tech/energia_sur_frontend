@@ -1,0 +1,484 @@
+{
+  "chart": {
+    "references": [
+      {
+        "x": 1,
+        "pace": 0,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 2,
+        "pace": 8.854973005753047,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 3,
+        "pace": 17.709946011506094,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 4,
+        "pace": 26.56491901725914,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 5,
+        "pace": 35.41989202301219,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 6,
+        "pace": 44.27486502876524,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 7,
+        "pace": 53.12983803451828,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 8,
+        "pace": 61.98481104027133,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 9,
+        "pace": 70.83978404602438,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 10,
+        "pace": 79.69475705177743,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 11,
+        "pace": 88.54973005753048,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 12,
+        "pace": 97.40470306328352,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 13,
+        "pace": 106.25967606903656,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 14,
+        "pace": 115.11464907478963,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 15,
+        "pace": 123.96962208054266,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 16,
+        "pace": 132.82459508629572,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 17,
+        "pace": 141.67956809204875,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 18,
+        "pace": 150.5345410978018,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 19,
+        "pace": 159.38951410355486,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 20,
+        "pace": 168.24448710930793,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 21,
+        "pace": 177.09946011506096,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 22,
+        "pace": 185.954433120814,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 23,
+        "pace": 194.80940612656704,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 24,
+        "pace": 203.66437913232008,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 25,
+        "pace": 212.51935213807312,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 26,
+        "pace": 221.3743251438262,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 27,
+        "pace": 230.22929814957925,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 28,
+        "pace": 239.0842711553323,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 29,
+        "pace": 247.93924416108533,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 30,
+        "pace": 256.7942171668384,
+        "target": 265.64919017259143
+      },
+      {
+        "x": 31,
+        "pace": 265.64919017259143,
+        "target": 265.64919017259143
+      }
+    ],
+    "observed": [
+      {
+        "x": 1,
+        "real": 0
+      },
+      {
+        "x": 1.9583333333333335,
+        "real": 5.635000000000005
+      },
+      {
+        "x": 2.958333333333333,
+        "real": 11.515
+      },
+      {
+        "x": 3.9583333333333335,
+        "real": 17.394999999999996
+      },
+      {
+        "x": 4.958333333333334,
+        "real": 23.275000000000006
+      },
+      {
+        "x": 5.958333333333333,
+        "real": 29.155
+      },
+      {
+        "x": 6.958333333333333,
+        "real": 35.035
+      },
+      {
+        "x": 7.958333333333333,
+        "real": 40.91499999999999
+      },
+      {
+        "x": 8.958333333333332,
+        "real": 46.79499999999999
+      },
+      {
+        "x": 9.5,
+        "real": 49.97999999999999
+      }
+    ],
+    "estimated": [
+      {
+        "x": 9.5,
+        "projected": 49.97999999999999
+      },
+      {
+        "x": 31,
+        "projected": 176.39999999999998
+      }
+    ]
+  },
+  "goal": {
+    "status": "on_track",
+    "goalKwh": 265.64919017259143,
+    "goalCostArs": 50000,
+    "inputMode": "ars",
+    "allowedPerDayKwh": 8.854973005753047,
+    "allowedPerWeekKwh": 61.98481104027133,
+    "daysInMonth": 30,
+    "elapsedDays": 8.5,
+    "measuredDays": 8.5,
+    "coverage": 1,
+    "consumedKwh": 49.97999999999999,
+    "dailyRateKwh": 5.879999999999999,
+    "expectedKwh": 75.2672705489009,
+    "projectedMonthKwh": 176.39999999999998,
+    "projectedCostArs": 37219.69,
+    "deviationKwh": -89.24919017259145,
+    "deviationPct": -33.59663551566129,
+    "remainingPerDayKwh": 10.031125124306579
+  },
+  "choice": {
+    "mode": "ars",
+    "value": 50000,
+    "tariffVersion": "spse-v1:100:15000:116.053|200:16000:120.293|300:17000:124.224|400:18000:127.211|99999:22000:128.78"
+  },
+  "tariff": {
+    "valid": true,
+    "version": "spse-v1:100:15000:116.053|200:16000:120.293|300:17000:124.224|400:18000:127.211|99999:22000:128.78",
+    "effectiveDate": null,
+    "category": "SPSE · Residencial sin subsidio",
+    "includeFixed": true,
+    "included": [
+      "Cargo fijo mensual",
+      "Cargo variable según tramo del consumo total"
+    ],
+    "excluded": [
+      "Impuestos no configurados",
+      "Agua",
+      "Cloaca",
+      "Alumbrado y otros conceptos"
+    ],
+    "note": "Fecha de vigencia no registrada. Verificá el cuadro configurado; no es una factura total."
+  },
+  "month": "2026-11",
+  "daysInMonth": 30,
+  "todayX": 9.5,
+  "monthStart": "2026-11-01T03:00:00.000Z",
+  "monthEnd": "2026-12-01T03:00:00.000Z",
+  "measuredFrom": "2026-11-01T03:00:00.000Z",
+  "measuredTo": "2026-11-09T15:00:00.000Z",
+  "measuredKwh": 49.97999999999999,
+  "estimatedToDateKwh": 49.97999999999999,
+  "missingStart": false,
+  "exceededKwh": 0,
+  "remainingDays": 21.5,
+  "quality": {
+    "coverage": 1,
+    "gaps": 0,
+    "resets": 0,
+    "stale": false,
+    "completeDays": 8,
+    "samples": 205,
+    "truncated": false
+  },
+  "warnings": [],
+  "monthDaily": [
+    {
+      "day": "2026-11-01",
+      "at": "2026-11-02T02:00:00.000Z",
+      "x": 1.9583333333333335,
+      "consumedKwh": 5.635000000000005
+    },
+    {
+      "day": "2026-11-02",
+      "at": "2026-11-03T02:00:00.000Z",
+      "x": 2.958333333333333,
+      "consumedKwh": 11.515
+    },
+    {
+      "day": "2026-11-03",
+      "at": "2026-11-04T02:00:00.000Z",
+      "x": 3.9583333333333335,
+      "consumedKwh": 17.394999999999996
+    },
+    {
+      "day": "2026-11-04",
+      "at": "2026-11-05T02:00:00.000Z",
+      "x": 4.958333333333334,
+      "consumedKwh": 23.275000000000006
+    },
+    {
+      "day": "2026-11-05",
+      "at": "2026-11-06T02:00:00.000Z",
+      "x": 5.958333333333333,
+      "consumedKwh": 29.155
+    },
+    {
+      "day": "2026-11-06",
+      "at": "2026-11-07T02:00:00.000Z",
+      "x": 6.958333333333333,
+      "consumedKwh": 35.035
+    },
+    {
+      "day": "2026-11-07",
+      "at": "2026-11-08T02:00:00.000Z",
+      "x": 7.958333333333333,
+      "consumedKwh": 40.91499999999999
+    },
+    {
+      "day": "2026-11-08",
+      "at": "2026-11-09T02:00:00.000Z",
+      "x": 8.958333333333332,
+      "consumedKwh": 46.79499999999999
+    },
+    {
+      "day": "2026-11-09",
+      "at": "2026-11-09T15:00:00.000Z",
+      "x": 9.5,
+      "consumedKwh": 49.97999999999999
+    }
+  ],
+  "gapDays": [],
+  "method": "Estimación basada en el ritmo observado: energía entre extremos / duración exacta observada; consumo observado + inicio no medido estimado + ritmo × tiempo restante.",
+  "meterName": "Medidor de prueba · Oficina",
+  "profile": [
+    {
+      "hour": 0,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 1,
+      "samples": 8,
+      "avgPowerW": 98
+    },
+    {
+      "hour": 2,
+      "samples": 8,
+      "avgPowerW": 98
+    },
+    {
+      "hour": 3,
+      "samples": 8,
+      "avgPowerW": 98
+    },
+    {
+      "hour": 4,
+      "samples": 8,
+      "avgPowerW": 98
+    },
+    {
+      "hour": 5,
+      "samples": 8,
+      "avgPowerW": 98
+    },
+    {
+      "hour": 6,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 7,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 8,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 9,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 10,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 11,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 12,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 13,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 14,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 15,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 16,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 17,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 18,
+      "samples": 8,
+      "avgPowerW": 540
+    },
+    {
+      "hour": 19,
+      "samples": 8,
+      "avgPowerW": 540
+    },
+    {
+      "hour": 20,
+      "samples": 8,
+      "avgPowerW": 540
+    },
+    {
+      "hour": 21,
+      "samples": 8,
+      "avgPowerW": 540
+    },
+    {
+      "hour": 22,
+      "samples": 8,
+      "avgPowerW": 180
+    },
+    {
+      "hour": 23,
+      "samples": 8,
+      "avgPowerW": 180
+    }
+  ],
+  "profileMinDays": 3,
+  "lookbackDays": 30,
+  "recommendations": [
+    {
+      "id": "standby",
+      "title": "Detectamos un consumo base nocturno cercano a 98 W",
+      "detail": "Es la menor potencia media entre las franjas de 01 a 05 h con muestras. Período analizado: 1/11/2026, 00:00:00 a 9/11/2026, 12:00:00. Si esta potencia se mantuviera las 24 horas, equivaldría aproximadamente a 70,6 kWh al mes. Es un escenario, no ahorro garantizado ni consumo totalmente evitable. No identifica aparatos y puede incluir equipos necesarios.",
+      "impact": null,
+      "tone": "action"
+    },
+    {
+      "id": "peak-window",
+      "title": "Tu mayor consumo es entre las 18 y las 21 h",
+      "detail": "En esa franja promediás 540 W, bastante más que el resto del día. Revisá qué usos coinciden con ese horario antes de atribuirlo a un aparato. Mover un consumo de horario no reduce por sí solo su energía.",
+      "impact": null,
+      "tone": "info"
+    },
+    {
+      "id": "on-track",
+      "title": "Vas bien encaminado",
+      "detail": "Al ritmo actual terminás el mes en 176,4 kWh, 89,2 kWh por debajo de tu objetivo. Manteniendo este consumo, llegás.",
+      "impact": null,
+      "tone": "good"
+    }
+  ]
+}

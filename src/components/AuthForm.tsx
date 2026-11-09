@@ -148,6 +148,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </button>
         </form>
 
+        {mode === 'login' && <p className="mt-4 text-center text-sm"><Link href="/recuperar-clave" className="inline-flex min-h-11 items-center text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">Olvidé mi contraseña</Link></p>}
         <p className="mt-4 text-center text-sm">
           <Link href={copy.switchHref} className="text-accent hover:underline">
             {copy.switchLabel}

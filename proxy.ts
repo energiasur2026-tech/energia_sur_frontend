@@ -2,7 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { publicSupabaseEnv } from '@/lib/env-public';
 
-const AUTH_PAGES = ['/login', '/register'];
+// /login must reach the browser: recovery fragments are invisible to the
+// server, even when an older signed-in cookie is already present.
+const AUTH_PAGES = ['/register'];
 
 /**
  * Refresca la cookie de sesión de Supabase en cada visita a una página de la

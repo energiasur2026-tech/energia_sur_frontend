@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const ts=require('typescript');
+const vm=require('node:vm');
+const code=ts.transpileModule(fs.readFileSync('src/lib/goal-draft.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const box={exports:{},Intl};vm.runInNewContext(code,box);
+for(const [text,value] of [['50.000',50000],['50.000,25',50000.25],['266',266],['0,25',0.25],['50.000,',50000]])assert.equal(box.exports.parseGoalText(text),value);
+for(const text of ['', '0','-5','foo','1.5','1e3','50000.50'])assert.equal(box.exports.parseGoalText(text),null);
+assert.equal(box.exports.editableGoalNumber(50000),'50.000');
+assert.equal(box.exports.editableGoalNumber(265.64919017259143),'265,64919');
+console.log('14 Argentine goal draft checks passed.');

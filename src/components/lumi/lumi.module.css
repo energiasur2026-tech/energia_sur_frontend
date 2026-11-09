@@ -1,0 +1,102 @@
+.avatar { position: relative; display: inline-block; width: 136px; aspect-ratio: 480 / 520; flex: 0 0 auto; }
+.character { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 250ms ease-in-out; pointer-events: none; }
+.character[data-active='true'] { opacity: 1; }
+.compact { width: 72px; aspect-ratio: 1; }
+.indicator { position: absolute; right: 0; top: 22%; min-width: 24px; height: 24px; padding: 0 4px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: white; font: 800 18px/1 system-ui; box-shadow: 0 2px 8px #0003; }
+.avatar[data-state='alert'] .indicator { background: var(--danger); }
+.avatar[data-state='success'] .indicator { background: var(--ok); }
+.avatar[data-state='analyzing'] .indicator { font-size: 11px; }
+.compact .indicator { top: auto; bottom: 0; right: -1px; }
+.avatar[data-state='analyzing'] .indicator { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .5; } }
+.avatar[data-reduced-motion] *, .avatar[data-reduced-motion] { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .avatar *, .avatar { animation: none !important; transition: none !important; } }
+.launcher { position: fixed; right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); z-index: 45; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.trigger { position: relative; width: 108px; height: 117px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; appearance: none; cursor: pointer; pointer-events: auto; display: grid; place-items: center; overflow: visible; -webkit-tap-highlight-color: transparent; }
+.trigger:hover, .trigger:active { background: transparent; box-shadow: none; }
+.trigger .avatar { width: 108px; }
+/* The button stays fixed. This persistent wrapper alone moves, even when a
+   keyed pose changes. Disable pose transforms only in the floating trigger. */
+.suspended { display: inline-flex; line-height: 0; animation: suspended 5s ease-in-out infinite; }
+.trigger .avatar[data-state] .character { animation: none; }
+@keyframes suspended { 0%, 100% { transform: translateY(3px); } 50% { transform: translateY(-3px); } }
+.suspended[data-reduced-motion] { animation: none; transform: none; }
+@media (prefers-reduced-motion: reduce) { .suspended { animation: none; transform: none; } }
+.trigger .indicator { right: 6px; }
+.trigger:focus-visible, .panel :is(button,input):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.intro { max-width: 230px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--foreground); box-shadow: 0 4px 14px #0001; font-size: 12px; }
+.counter { position: absolute; top: 0; right: 12px; border: 0; background: var(--danger); color: white; border-radius: 20px; min-width: 24px; padding: 2px 5px; font-size: 11px; font-weight: 700; }
+.panel { --lumi-panel-gap: 24px; position: fixed; inset: auto 24px calc(var(--lumi-viewport-bottom, 0px) + var(--lumi-panel-gap)) auto; margin: 0; padding: 0; width: min(440px, calc(100vw - 32px)); max-height: calc(var(--lumi-viewport-height, 100dvh) - var(--lumi-panel-gap) - 16px - env(safe-area-inset-top)); height: 690px; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: 0 24px 90px #061b4540; overflow: hidden; animation: panelIn 220ms ease-out both; }
+.panel[open] { display: flex; flex-direction: column; }
+.panel::backdrop { background: #06152745; animation: backdropIn 220ms ease-out both; }
+.panel[data-closing] { animation: panelOut 220ms ease-in both; pointer-events: none; }
+.panel[data-closing]::backdrop { animation: backdropOut 220ms ease-in both; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes panelOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(10px); } }
+@keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdropOut { from { opacity: 1; } to { opacity: 0; } }
+.panel[data-reduced-motion], .panel[data-reduced-motion]::backdrop { animation: none; transform: none; }
+@media (prefers-reduced-motion: reduce) { .panel, .panel::backdrop { animation: none !important; transform: none !important; } }
+.panel button { cursor: pointer; }
+.panel button:disabled, .panel input:disabled { cursor: not-allowed; opacity: .55; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 8px; flex-shrink: 0; }
+.header h2 { font-size: 21px; font-weight: 750; letter-spacing: -.5px; }
+.header h2 span { color: var(--muted); font-weight: 400; font-size: 12px; letter-spacing: 0; }
+.header p { font-size: 12px; color: var(--muted); }
+.header button { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: var(--surface-raised); }
+.hero { display: flex; align-items: center; padding: 0 20px; gap: 12px; background: radial-gradient(ellipse at 17% 40%, #00d9d917, transparent 60%); flex-shrink: 0; }
+.hero .avatar { width: 104px; }
+.hero strong { font-size: 15px; line-height: 1.35; display: block; }
+.hero p { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 12px; flex-shrink: 0; }
+.tabs button { display: flex; flex: 1; gap: 5px; justify-content: center; align-items: center; min-height: 48px; font-size: 12px; border-bottom: 2px solid transparent; }
+.tabs button[aria-pressed='true'] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 650; }
+.content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; flex: 1; }
+.chat { min-height: 0; display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.historyArea { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.history { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; padding: 16px; scroll-behavior: auto; }
+.history:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.message { flex-shrink: 0; }
+.chatTools { flex-shrink: 0; padding: 0 16px; }
+.chatTools .clear { margin: 0; align-items: center; justify-content: flex-end; }
+.chatTools .clear button { min-height: 36px; }
+.chatFooter { flex-shrink: 0; border-top: 1px solid var(--border); padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); }
+.newMessages { align-self: center; min-height: 44px; margin: 4px 16px 8px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--accent-soft); color: var(--foreground); font-size: 12px; flex-shrink: 0; }
+.empty { color: var(--muted); font-size: 14px; line-height: 1.7; padding: 20px 4px; }
+.message { white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 15px; background: var(--surface-raised); padding: 12px 14px; font-size: 14px; line-height: 1.65; max-width: 94%; }
+.message strong { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.message[data-role='user'] { align-self: flex-end; background: var(--accent-soft); }
+.note { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 0 0 8px; }
+.composer { display: flex; gap: 8px; }
+.composer input { min-width: 0; flex: 1; border: 1px solid var(--border); border-radius: 14px; min-height: 48px; padding: 10px 12px; font-size: 16px; background: var(--background); }
+.composer button { width: 48px; min-height: 48px; display: grid; place-items: center; background: var(--accent); color: white; border-radius: 14px; }
+.clear { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.clear button { min-height: 44px; text-decoration: underline; }
+.error { background: var(--surface-raised); border: 1px solid var(--border); padding: 12px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
+.error button, .event > button { color: var(--accent); min-height: 44px; font-weight: 600; }
+.event { border: 1px solid var(--border); border-radius: 15px; padding: 14px; margin-bottom: 12px; font-size: 13px; line-height: 1.6; }
+.event[data-priority='true'] { border-left: 4px solid var(--danger); }
+.event[data-priority='true'] > strong { color: var(--danger); }
+.event time { display: block; color: var(--muted); font-size: 11px; margin: 4px 0 10px; }
+.event p { margin-bottom: 10px; }
+.event legend { color: var(--muted); font-size: 12px; margin: 8px 0; }
+.event fieldset { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.event label { min-height: 44px; display: flex; align-items: center; gap: 6px; }
+.preferences h3 { font-size: 18px; font-weight: 650; }
+.preferences p { color: var(--muted); font-size: 13px; margin: 8px 0 18px; }
+.preferences label { display: flex; align-items: center; gap: 10px; min-height: 52px; font-size: 14px; }
+@media (max-width: 767px) {
+  .launcher { right: max(16px, env(safe-area-inset-right)); bottom: calc(5.25rem + env(safe-area-inset-bottom)); }
+  .trigger { width: 90px; height: 97.5px; }
+  .trigger .avatar { width: 90px; }
+  .panel { --lumi-panel-gap: calc(4.75rem + env(safe-area-inset-bottom)); left: 8px; right: 8px; width: auto; border-radius: 20px; }
+  .panel[data-keyboard='true'] { --lumi-panel-gap: calc(12px + env(safe-area-inset-bottom)); }
+  .panel[data-keyboard='true'] .hero { display: none; }
+  .intro { max-width: 185px; }
+}
+@media (max-height: 570px) { .hero { display: none; } }
+/* Home setup has a sticky save bar above the mobile navigation. */
+:global(body:has(.sticky-above-nav)) .launcher { bottom: calc(14rem + env(safe-area-inset-bottom)); }
+@media (max-width: 767px) {
+  .panel { left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); max-width: calc(100vw - 16px); }
+}

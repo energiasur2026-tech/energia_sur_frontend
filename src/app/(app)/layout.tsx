@@ -1,8 +1,11 @@
+import { Suspense } from 'react';
+import { MeterContextBoundary } from '@/components/MeterContextBoundary';
 import { redirect } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
 import { PageTransition } from '@/components/PageTransition';
 import { SetupNotice } from '@/components/SetupNotice';
 import { WelcomeDialog } from '@/components/WelcomeDialog';
+import { LumiWidget } from '@/components/lumi/LumiWidget';
 import { getCurrentUser } from '@/lib/auth';
 import { MissingEnvError } from '@/lib/errors';
 
@@ -28,12 +31,15 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   return (
     // `pb-nav` reserva en mobile el alto de la barra inferior fija, para que
     // el final del contenido no quede tapado detrás de ella.
-    <div className="flex-1 flex flex-col pb-nav">
+    <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><div className="flex-1 flex flex-col pb-nav">
       <AppNav userEmail={user.email} />
-      <PageTransition>{children}</PageTransition>
+      <div className="flex flex-1 flex-col pb-40">
+        <PageTransition>{children}</PageTransition>
+      </div>
       {/* Va en el layout y no en una pantalla: aparece al entrar a la app, sea
           cual sea la seccion a la que se llegue despues del login. */}
       <WelcomeDialog />
-    </div>
+      <LumiWidget key={user.id} userId={user.id} />
+    </div></MeterContextBoundary></Suspense>
   );
 }
