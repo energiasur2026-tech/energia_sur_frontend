@@ -18,6 +18,7 @@ import type { EventRecord } from '@/lib/event-types';
 import type { MeterThresholds } from '@/lib/threshold-types';
 import type { SeriesPoint } from '@/lib/types';
 import { useChartColors } from '@/lib/use-chart-colors';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 
 /**
@@ -41,6 +42,8 @@ export function EventChart({
   event: EventRecord;
   thresholds: MeterThresholds | null;
 }) {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
   const colors = useChartColors();
@@ -51,7 +54,11 @@ export function EventChart({
         from: event.startedAt,
         to: event.endedAt ?? new Date().toISOString(),
       });
+<<<<<<< HEAD
       const response = await meterFetch(`/api/meter/event-series?${params}`, { cache: 'no-store' });
+=======
+      const response = await fetch(apiUrl(`/api/meter/event-series?${params}`, deviceId), { cache: 'no-store' });
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
 
       if (!response.ok) {
         setFailed(true);
@@ -63,7 +70,7 @@ export function EventChart({
     } catch {
       setFailed(true);
     }
-  }, [event.startedAt, event.endedAt]);
+  }, [event.startedAt, event.endedAt, deviceId]);
 
   // Se pide una vez al abrir; el intervalo largo solo cubre eventos en curso.
   usePolling(fetchSeries, 120000);

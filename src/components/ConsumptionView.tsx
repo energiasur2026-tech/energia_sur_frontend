@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Info, Plug, Receipt } from 'lucide-react';
 import { formatCurrency, formatDateTime, formatNumber, NO_DATA } from '@/lib/format';
 import { DEFAULT_PERIOD, PERIOD_KEYS, type PeriodKey } from '@/lib/periods';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import type { ApiErrorPayload, ConsumptionPayload } from '@/lib/types';
 import { InfoTooltip } from './InfoTooltip';
@@ -23,7 +24,13 @@ const REASON_MESSAGE: Record<string, string> = {
 };
 
 export function ConsumptionView() {
+<<<<<<< HEAD
   const [period, setPeriod] = useState<PeriodKey | 'billing'>(DEFAULT_PERIOD);
+=======
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
+  const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PERIOD);
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
   const [data, setData] = useState<ConsumptionPayload | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   const [closedOn,setClosedOn]=useState('');
@@ -34,7 +41,11 @@ export function ConsumptionView() {
   const fetchConsumption = useCallback(async () => {
     const id=++requestId.current;
     try {
+<<<<<<< HEAD
       const response = await meterFetch(`/api/meter/consumption?period=${period}`, {
+=======
+      const response = await fetch(apiUrl(`/api/meter/consumption?period=${period}`, deviceId), {
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         cache: 'no-store',
       });
       const payload = await response.json();
@@ -53,7 +64,7 @@ export function ConsumptionView() {
       if(id!==requestId.current)return;
       setError({ error: failure instanceof Error ? failure.message : 'No se pudo contactar al servidor.' });
     }
-  }, [period]);
+  }, [period, deviceId]);
 
   usePolling(fetchConsumption, POLL_INTERVAL_MS);
   async function saveClose(event:React.FormEvent){event.preventDefault();if(!closedOn)return;++requestId.current;setData(null);setSavingClose(true);setError(null);
@@ -65,15 +76,22 @@ export function ConsumptionView() {
     return <SetupNotice missing={error.missingEnv} />;
   }
 
+  // Un medidor de área no es una factura aparte: el cargo fijo se paga una
+  // vez por instalación, así que acá la unidad es la energía y el costo es
+  // apenas una referencia de cuánto de la factura explica este lugar.
+  const isArea = data?.role === 'area';
+
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto">
       <header className="flex flex-wrap items-start justify-between gap-4 mb-5 md:mb-7">
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight">
-            Cuánto gastaste de luz
+            {isArea ? 'Cuánta luz usó este lugar' : 'Cuánto gastaste de luz'}
           </h1>
           <p className="text-sm text-muted mt-0.5">
-            Lo que consumiste y lo que costaría esa energía en tu factura
+            {isArea
+              ? 'La electricidad que consumió este sector en el período'
+              : 'Lo que consumiste y lo que costaría esa energía en tu factura'}
           </p>
         </div>
 
@@ -116,7 +134,11 @@ export function ConsumptionView() {
         </p>
       )}
 
-      <section className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 mb-6 md:mb-8">
+      <section
+        className={`grid gap-3 md:gap-4 grid-cols-1 mb-6 md:mb-8 ${
+          isArea ? '' : 'sm:grid-cols-2'
+        }`}
+      >
         <article className="rounded-2xl border border-border-soft bg-surface p-5 md:p-6">
           <header className="flex items-center gap-2 mb-3">
             <Plug className="h-4 w-4 text-accent" />
@@ -135,28 +157,50 @@ export function ConsumptionView() {
           <p className="mt-2 text-xs text-muted leading-relaxed">
             Kilowatt-hora: la unidad con la que se mide y se cobra la luz.
           </p>
+
+          {/* En un área el costo baja de categoría: es una referencia dentro
+              de la tarjeta de energía, no un número principal al lado. */}
+          {isArea && data?.available && (
+            <p className="mt-4 flex items-start gap-2 border-t border-border-soft pt-3 text-xs text-muted leading-relaxed">
+              <Receipt className="h-3.5 w-3.5 mt-0.5 shrink-0 text-ok" />
+              <span>
+                Esto representa unos{' '}
+                <b className="text-foreground">{formatCurrency(data.cost.total)}</b> de tu
+                factura.
+                <InfoTooltip
+                  title="De dónde sale esa referencia"
+                  text="Es el precio por kWh del cuadro tarifario aplicado a lo que consumió este sector. No incluye el cargo fijo: ese se paga una vez por instalación, no por área, así que sumarlo acá daría un número inventado."
+                />
+              </span>
+            </p>
+          )}
         </article>
 
-        <article className="rounded-2xl border border-border-soft bg-surface p-5 md:p-6">
-          <header className="flex items-center gap-2 mb-3">
-            <Receipt className="h-4 w-4 text-ok" />
-            <h2 className="text-sm font-semibold">Cuánto costaría</h2>
-            <InfoTooltip title="Cuánto costaría" text="Es lo que costaría esa electricidad según el cuadro tarifario vigente: el cargo fijo del período más el precio por cada kWh consumido. Es una estimación de la parte de energía de tu factura, no la factura completa." />
-          </header>
-          <p>
-            <ValueFade
-              className="text-4xl font-bold tabular-nums tracking-tight"
-              value={data?.cost ? formatCurrency(data.cost.total) : NO_DATA}
-            />
-          </p>
-          <p className="mt-2 text-xs text-muted leading-relaxed">
-            Solo la parte de energía. Tu factura real suma además agua, cloaca y
-            otros conceptos que este medidor no mide.
-          </p>
-        </article>
+        {!isArea && (
+          <article className="rounded-2xl border border-border-soft bg-surface p-5 md:p-6">
+            <header className="flex items-center gap-2 mb-3">
+              <Receipt className="h-4 w-4 text-ok" />
+              <h2 className="text-sm font-semibold">Cuánto costaría</h2>
+              <InfoTooltip title="Cuánto costaría" text="Es lo que costaría esa electricidad según el cuadro tarifario vigente: el cargo fijo del período más el precio por cada kWh consumido. Es una estimación de la parte de energía de tu factura, no la factura completa." />
+            </header>
+            <p>
+              <ValueFade
+                className="text-4xl font-bold tabular-nums tracking-tight"
+                value={data?.cost ? formatCurrency(data.cost.total) : NO_DATA}
+              />
+            </p>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              Solo la parte de energía. Tu factura real suma además agua, cloaca y
+              otros conceptos que este medidor no mide.
+            </p>
+          </article>
+        )}
       </section>
 
-      {data?.available && (
+      {/* El desglose de la factura es del medidor central: es el que mide lo
+          que factura la distribuidora. En un área, con el cargo fijo afuera,
+          la tabla mostraría una factura que no existe. */}
+      {data?.available && !isArea && (
         <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 animate-fade-in">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-sm font-semibold">De dónde sale ese importe</h2>
@@ -202,6 +246,13 @@ export function ConsumptionView() {
             {formatDateTime(data.lastAt)}.
           </p>
         </section>
+      )}
+
+      {data?.available && isArea && (
+        <p className="text-xs text-muted leading-relaxed animate-fade-in">
+          Calculado con {data.samples.toLocaleString('es-AR')} mediciones tomadas
+          entre el {formatDateTime(data.firstAt)} y el {formatDateTime(data.lastAt)}.
+        </p>
       )}
     </div>
   );

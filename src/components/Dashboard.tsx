@@ -11,6 +11,7 @@ import { MetricCard } from './MetricCard';
 import { SetupNotice } from './SetupNotice';
 import { formatClock, formatDateTime, formatNumber, NO_DATA } from '@/lib/format';
 import { DEFAULT_RANGE, RANGES, RANGE_KEYS, type RangeKey } from '@/lib/ranges';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import type { EventRecord } from '@/lib/event-types';
 import type { GoalProgress } from '@/lib/goal';
@@ -33,6 +34,8 @@ type Context = {
 };
 
 export function Dashboard() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [live, setLive] = useState<LiveReading | null>(null);
   const [history, setHistory] = useState<HistoryPayload | null>(null);
   const [range, setRange] = useState<RangeKey>(DEFAULT_RANGE);
@@ -52,7 +55,11 @@ export function Dashboard() {
 
   const fetchLive = useCallback(async () => {
     try {
+<<<<<<< HEAD
       const response = await meterFetch('/api/meter/live', { cache: 'no-store' });
+=======
+      const response = await fetch(apiUrl('/api/meter/live', deviceId), { cache: 'no-store' });
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       const payload = await response.json();
 
       if (!response.ok) {
@@ -67,14 +74,18 @@ export function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [deviceId]);
 
   const fetchHistory = useCallback(async (key: RangeKey) => {
     const requestId = lastHistoryRequest.current + 1;
     lastHistoryRequest.current = requestId;
 
     try {
+<<<<<<< HEAD
       const response = await meterFetch(`/api/meter/history?range=${key}`, { cache: 'no-store' });
+=======
+      const response = await fetch(apiUrl(`/api/meter/history?range=${key}`, deviceId), { cache: 'no-store' });
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       const payload = await response.json();
       if (!response.ok) return;
       // Descarta la respuesta si mientras tanto se pidió otro rango.
@@ -84,7 +95,7 @@ export function Dashboard() {
     } catch {
       // El histórico es complementario: su fallo no debe tapar la lectura viva.
     }
-  }, []);
+  }, [deviceId]);
 
   /**
    * Objetivo, eventos y umbrales alimentan los KPIs nuevos y las marcas del
@@ -93,8 +104,13 @@ export function Dashboard() {
   const fetchContext = useCallback(async () => {
     try {
       const [forecastResponse, eventsResponse] = await Promise.all([
+<<<<<<< HEAD
         meterFetch('/api/meter/forecast', { cache: 'no-store' }),
         meterFetch('/api/meter/events', { cache: 'no-store' }),
+=======
+        fetch(apiUrl('/api/meter/forecast', deviceId), { cache: 'no-store' }),
+        fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' }),
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       ]);
 
       if (!forecastResponse.ok || !eventsResponse.ok) return;
@@ -111,7 +127,7 @@ export function Dashboard() {
     } catch {
       // Complementario: el Monitor sigue funcionando sin este contexto.
     }
-  }, []);
+  }, [deviceId]);
 
   const pollHistory = useCallback(() => fetchHistory(range), [fetchHistory, range]);
 

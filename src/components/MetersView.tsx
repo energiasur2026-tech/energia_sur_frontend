@@ -2,14 +2,19 @@
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Gauge, House, Layers, Plus, Target, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowRight, Check, Gauge, House, Layers, Link2Off, MapPin, Plus, Target, TriangleAlert, Zap } from 'lucide-react';
 import { formatNumber, formatRelativeMinutes, NO_DATA } from '@/lib/format';
 import type { GoalProgress } from '@/lib/goal';
-import type { HomeSummary } from '@/lib/home-types';
+import type { HomeSummary } from '@/domain/home-types';
+import { PHASE_LABEL, type MeterPhases } from '@/domain/installation-types';
+import { ROLE_LABEL, type MeterRole } from '@/domain/meter-role';
 import type { ApiErrorPayload } from '@/lib/types';
+import { meterHref } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
+import { LinkMeterForm, type LinkResult } from './LinkMeterForm';
 import { SetupNotice } from './SetupNotice';
+import { UnlinkMeterDialog } from './UnlinkMeterDialog';
 
 /** Panorama, no tablero en vivo: alcanza con refrescar cada minuto. */
 const POLL_INTERVAL_MS = 60000;
@@ -21,11 +26,32 @@ type MeterSummary = {
   activeEvents: number;
   goal: GoalProgress;
   home: HomeSummary;
+  role: MeterRole;
+  /** Dónde está instalado, si es de área. `null` en un central. */
+  areaLabel: string | null;
+  phases: MeterPhases;
+  /**
+   * Si esta cuenta vinculó el medidor o es una invitada.
+   *
+   * Manda sobre la acción de desvincular: una cuenta invitada que la viera
+   * terminaría en un 403. Es preferible no ofrecer lo que no se puede hacer.
+   */
+  isOwner: boolean;
 };
 
 export function MetersView() {
   const [meters, setMeters] = useState<MeterSummary[] | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
+  /** El medidor cuya baja se está confirmando. */
+  const [unlinking, setUnlinking] = useState<MeterSummary | null>(null);
+  const [unlinked, setUnlinked] = useState<{ name: string; readings: number } | null>(null);
+  /**
+   * El resultado del último alta.
+   *
+   * Vive acá y no en el formulario porque vincular el primer medidor cambia
+   * la lista y vuelve a montar el formulario: el aviso duraba dos segundos.
+   */
+  const [linked, setLinked] = useState<LinkResult | null>(null);
 
   const fetchMeters = useCallback(async () => {
     try {
@@ -46,6 +72,30 @@ export function MetersView() {
 
   usePolling(fetchMeters, POLL_INTERVAL_MS);
 
+  async function unlink(meter: MeterSummary) {
+    try {
+      const response = await fetch(
+        `/api/meters?deviceId=${encodeURIComponent(meter.deviceId)}`,
+        { method: 'DELETE' }
+      );
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload as ApiErrorPayload);
+        return;
+      }
+
+      setUnlinked({ name: meter.name, readings: Number(payload.keptReadings ?? 0) });
+      setLinked(null);
+      setError(null);
+      await fetchMeters();
+    } catch {
+      setError({ error: 'No se pudo contactar al servidor.' });
+    } finally {
+      setUnlinking(null);
+    }
+  }
+
   if (error?.missingEnv) return <SetupNotice missing={error.missingEnv} />;
 
   return (
@@ -63,49 +113,143 @@ export function MetersView() {
         </p>
       )}
 
+      {linked && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-ok/40 bg-ok/5 px-4 py-3 animate-fade-in">
+          <Check className="h-4 w-4 mt-0.5 shrink-0 text-ok" />
+          <p className="text-xs text-muted leading-relaxed">
+            Vinculamos <b className="text-foreground">{linked.name}</b>.{' '}
+            {linked.existingReadings > 0 ? (
+              <>
+                Encontramos{' '}
+                <b className="text-foreground">
+                  {linked.existingReadings.toLocaleString('es-AR')} mediciones anteriores
+                </b>{' '}
+                de este medidor: ya tenés su historial completo, sin esperar a juntar
+                datos nuevos.
+              </>
+            ) : (
+              <>
+                Todavía no tiene mediciones: van a empezar a aparecer en los próximos
+                minutos.
+              </>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => setLinked(null)}
+            aria-label="Cerrar aviso"
+            className="ml-auto shrink-0 text-muted transition-colors hover:text-foreground"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {unlinked && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-border-soft bg-surface px-4 py-3 animate-fade-in">
+          <Link2Off className="h-4 w-4 mt-0.5 shrink-0 text-muted" />
+          <p className="text-xs text-muted leading-relaxed">
+            Desvinculamos <b className="text-foreground">{unlinked.name}</b>. Sus{' '}
+            <b className="text-foreground">
+              {unlinked.readings.toLocaleString('es-AR')} mediciones
+            </b>{' '}
+            quedaron guardadas: si lo volvés a vincular, las recuperás.
+          </p>
+          <button
+            type="button"
+            onClick={() => setUnlinked(null)}
+            aria-label="Cerrar aviso"
+            className="ml-auto shrink-0 text-muted transition-colors hover:text-foreground"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {!meters && <p className="text-center text-sm text-muted py-16">Cargando…</p>}
 
       {meters?.length === 0 && (
-        <div className="rounded-2xl border border-border-soft bg-surface p-10 text-center">
-          <Gauge className="h-8 w-8 text-muted mx-auto mb-3" />
-          <p className="text-sm font-medium">Todavía no tenés medidores vinculados.</p>
-          <p className="mt-1 text-xs text-muted">
-            La vinculación se hace por ahora de forma manual. Escribinos para
-            sumar un medidor a tu cuenta.
-          </p>
-        </div>
+        <>
+          <div className="rounded-2xl border border-border-soft bg-surface p-10 text-center">
+            <Gauge className="h-8 w-8 text-muted mx-auto mb-3" />
+            <p className="text-sm font-medium">Todavía no tenés medidores vinculados.</p>
+            <p className="mt-1 text-xs text-muted">
+              Sumá el tuyo con el identificador impreso en el equipo.
+            </p>
+          </div>
+        </>
       )}
 
       {meters && meters.length > 0 && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-fade-in">
             {meters.map((meter) => (
-              <MeterCard key={meter.deviceId} meter={meter} />
+              <MeterCard
+                key={meter.deviceId}
+                meter={meter}
+                onUnlink={() => setUnlinking(meter)}
+              />
             ))}
           </div>
 
-          {/* El alta de medidores todavía es manual; decirlo evita que alguien
-              busque un botón que no existe. */}
-          <p className="mt-6 flex items-center gap-2 rounded-xl border border-border-soft bg-surface px-4 py-3 text-xs text-muted">
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-            Para sumar otro medidor hace falta vincularlo con sus credenciales.
-            Por ahora esa alta se hace de forma manual.
-          </p>
         </>
       )}
+
+      {/* Fuera de las dos ramas a propósito: dibujarlo dentro de cada una lo
+          desmonta al vincular el primer medidor —la lista deja de estar
+          vacía y cambia la rama— y se pierde el aviso de cuántas mediciones
+          anteriores se recuperaron, que es lo que el usuario necesita leer
+          justo en ese momento. */}
+      {meters && (
+        <div className="mt-6">
+          <LinkMeterForm
+            onLinked={(result) => {
+              setLinked(result);
+              // Los dos avisos juntos contarían dos historias a la vez sobre
+              // el mismo medidor.
+              setUnlinked(null);
+              fetchMeters();
+            }}
+          />
+        </div>
+      )}
+
+      <UnlinkMeterDialog
+        open={unlinking !== null}
+        meterName={unlinking?.name ?? ''}
+        onCancel={() => setUnlinking(null)}
+        onConfirm={() => (unlinking ? unlink(unlinking) : Promise.resolve())}
+      />
     </div>
   );
 }
 
-function MeterCard({ meter }: { meter: MeterSummary }) {
+function MeterCard({ meter, onUnlink }: { meter: MeterSummary; onUnlink: () => void }) {
   const goalLabel = goalSummary(meter.goal);
 
   return (
     <article className="flex flex-col rounded-2xl border border-border-soft bg-surface p-5">
       <header className="flex items-start justify-between gap-3 mb-4">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-bold tracking-tight">{meter.name}</h2>
-          <p className="text-xs text-muted mt-0.5">
+          {/* Qué mide este medidor. Es una etiqueta suya y nada más: las
+              tarjetas no se suman ni se comparan entre sí. */}
+          <p className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">
+              {meter.role === 'central' ? (
+                <Zap className="h-3 w-3" />
+              ) : (
+                <MapPin className="h-3 w-3" />
+              )}
+              {meter.role === 'central' ? ROLE_LABEL.central : meter.areaLabel || ROLE_LABEL.area}
+            </span>
+            {meter.phases === 3 && (
+              <span className="inline-flex items-center rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">
+                {PHASE_LABEL[3]}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-muted mt-1">
             {meter.latest
               ? `Última medición ${formatRelativeMinutes(meter.latest.recordedAt)}`
               : 'Sin mediciones todavía'}
@@ -150,15 +294,39 @@ function MeterCard({ meter }: { meter: MeterSummary }) {
         />
       </div>
 
+<<<<<<< HEAD
       <HomeStatus home={meter.home} meterId={meter.deviceId} />
+=======
+      <HomeStatus home={meter.home} deviceId={meter.deviceId} />
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
 
+      {/* Los enlaces llevan el medidor de esta tarjeta: sin eso, con más de
+          uno vinculado, "Ir a mi medidor" abriría siempre el primero. */}
       <Link
+<<<<<<< HEAD
         href={`/dashboard?meterId=${encodeURIComponent(meter.deviceId)}`}
+=======
+        href={meterHref('/dashboard', meter.deviceId)}
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85"
       >
         Ir a mi medidor
         <ArrowRight className="h-4 w-4" />
       </Link>
+
+      {/* Solo para quien vinculó el medidor: una cuenta invitada no puede
+          desvincularlo y el botón terminaría en un 403. Va discreto y al
+          final: es la acción menos frecuente y la más difícil de deshacer. */}
+      {meter.isOwner && (
+        <button
+          type="button"
+          onClick={onUnlink}
+          className="mt-2 inline-flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-danger"
+        >
+          <Link2Off className="h-3.5 w-3.5" />
+          Desvincular de mi cuenta
+        </button>
+      )}
     </article>
   );
 }
@@ -171,7 +339,11 @@ function MeterCard({ meter }: { meter: MeterSummary }) {
  * —cuantos ambientes y aparatos hay— y el enlace baja a secundario, porque ya
  * no hay nada que reclamarle al usuario.
  */
+<<<<<<< HEAD
 function HomeStatus({ home, meterId }: { home: HomeSummary; meterId: string }) {
+=======
+function HomeStatus({ home, deviceId }: { home: HomeSummary; deviceId: string }) {
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
   return (
     <div className="mb-4 space-y-2">
       <div
@@ -186,11 +358,11 @@ function HomeStatus({ home, meterId }: { home: HomeSummary; meterId: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold leading-tight">
-            {home.configured ? 'Contexto del hogar cargado' : 'Sin componentes del hogar'}
+            {home.configured ? 'Contexto del lugar cargado' : 'Sin contexto cargado'}
           </p>
           <p className={`text-[11px] leading-tight ${home.configured ? 'text-accent' : 'text-muted'}`}>
             {home.configured
-              ? `${home.rooms} ${home.rooms === 1 ? 'ambiente' : 'ambientes'} · ${home.appliances} ${
+              ? `${home.rooms} ${home.rooms === 1 ? 'lugar' : 'lugares'} · ${home.appliances} ${
                   home.appliances === 1 ? 'aparato' : 'aparatos'
                 }`
               : 'Mejora tus recomendaciones y predicciones'}
@@ -202,7 +374,11 @@ function HomeStatus({ home, meterId }: { home: HomeSummary; meterId: string }) {
           medidor", que ya es un boton lleno. Dos botones llenos del mismo color
           compiten entre si y ninguno de los dos termina destacando. */}
       <Link
+<<<<<<< HEAD
         href={`/medidores/hogar?meterId=${encodeURIComponent(meterId)}`}
+=======
+        href={meterHref('/medidores/hogar', deviceId)}
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
           home.configured
             ? 'bg-surface-raised text-muted hover:text-foreground'
@@ -210,7 +386,7 @@ function HomeStatus({ home, meterId }: { home: HomeSummary; meterId: string }) {
         }`}
       >
         {home.configured ? <Layers className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-        {home.configured ? 'Editar componentes del hogar' : 'Agregar componentes del hogar'}
+        {home.configured ? 'Editar lo que hay en el lugar' : 'Cargar lo que hay en el lugar'}
       </Link>
     </div>
   );

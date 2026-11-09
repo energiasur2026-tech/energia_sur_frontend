@@ -13,6 +13,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
+import { meterHref, useMeterId } from '@/lib/use-meter-id';
+import { MeterPicker } from './MeterPicker';
 import { ThemeToggle } from './ThemeToggle';
 
 /** `short` es la etiqueta de la barra inferior, donde el ancho es escaso. */
@@ -28,6 +30,10 @@ const LINKS = [
 export function AppNav({ userEmail }: { userEmail: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
+  // El medidor elegido viaja en cada enlace de la barra. Sin esto, pasar de
+  // Consumo a Monitor lo perdería y la pantalla mostraría otro medidor sin
+  // decir nada: el backend, sin el parámetro, resuelve el primero accesible.
+  const deviceId = useMeterId();
 
   async function onLogout() {
     await supabaseBrowser().auth.signOut();
@@ -38,8 +44,13 @@ export function AppNav({ userEmail }: { userEmail: string | null }) {
   return (
     <>
       <MobileHeader onLogout={onLogout} />
-      <TopNav pathname={pathname} userEmail={userEmail} onLogout={onLogout} />
-      <BottomNav pathname={pathname} />
+      <TopNav
+        pathname={pathname}
+        deviceId={deviceId}
+        userEmail={userEmail}
+        onLogout={onLogout}
+      />
+      <BottomNav pathname={pathname} deviceId={deviceId} />
     </>
   );
 }
@@ -60,6 +71,7 @@ function MobileHeader({ onLogout }: { onLogout: () => void }) {
       </span>
 
       <span className="flex items-center gap-1">
+        <MeterPicker />
         <ThemeToggle />
         <button
           type="button"
@@ -77,10 +89,12 @@ function MobileHeader({ onLogout }: { onLogout: () => void }) {
 /** Navegación de escritorio: pestañas arriba, con la cuenta a la derecha. */
 function TopNav({
   pathname,
+  deviceId,
   userEmail,
   onLogout,
 }: {
   pathname: string;
+  deviceId: string | null;
   userEmail: string | null;
   onLogout: () => void;
 }) {
@@ -95,7 +109,11 @@ function TopNav({
             return (
               <Link
                 key={href}
+<<<<<<< HEAD
                 href={selectedMeterUrl(href)}
+=======
+                href={meterHref(href, deviceId)}
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
                 aria-current={active ? 'page' : undefined}
                 className={`inline-flex items-center gap-2 px-3.5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   active
@@ -111,6 +129,7 @@ function TopNav({
         </div>
 
         <div className="flex items-center gap-2 text-xs text-muted">
+          <MeterPicker />
           {userEmail && <span className="hidden lg:inline">{userEmail}</span>}
           <ThemeToggle />
           <button
@@ -132,9 +151,13 @@ function TopNav({
  * app nativa. Sin menú hamburguesa — las seis secciones están siempre a la
  * vista, que es la diferencia entre sentirse app y sentirse web achicada.
  */
+<<<<<<< HEAD
 function BottomNav({ pathname }: { pathname: string }) {
   const meter = useSearchParams().get('meterId');
   const selectedMeterUrl = (href: string) => meter ? href + '?meterId=' + encodeURIComponent(meter) : href;
+=======
+function BottomNav({ pathname, deviceId }: { pathname: string; deviceId: string | null }) {
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border-soft bg-surface"
@@ -148,7 +171,11 @@ function BottomNav({ pathname }: { pathname: string }) {
           return (
             <li key={href}>
               <Link
+<<<<<<< HEAD
                 href={selectedMeterUrl(href)}
+=======
+                href={meterHref(href, deviceId)}
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
                 aria-current={active ? 'page' : undefined}
                 className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${
                   active ? 'text-accent' : 'text-muted'

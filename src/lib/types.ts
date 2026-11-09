@@ -1,6 +1,7 @@
 import type { RangeKey } from './ranges';
 import type { PeriodKey } from './periods';
 import type { EnergyCost } from './tariffs';
+import type { MeterRole } from '@/domain/meter-role';
 
 /** Formas de datos que viajan del servidor al navegador. */
 
@@ -62,9 +63,25 @@ export type ApiErrorPayload = {
 export type ConsumptionReason = 'insufficient_readings' | 'meter_counter_decreased' | 'billing_date_required';
 
 export type ConsumptionPayload = {
+<<<<<<< HEAD
   period: PeriodKey | 'billing';
   closedOn?: string | null;
   partialPeriod?: boolean;
+=======
+  /**
+   * Dónde está instalado el medidor. Viaja en esta respuesta para que la
+   * pantalla sepa cómo presentarse sin pedir los ajustes por separado: un
+   * central se lee contra la factura y un área se lee en energía.
+   */
+  role: MeterRole;
+  /**
+   * Si el costo se contrasta contra la factura. `false` en un medidor de
+   * área: ahí el costo viene SIN cargo fijo y es una referencia, no una
+   * factura aparte. Viaja siempre, incluso cuando no hay datos suficientes.
+   */
+  billable: boolean;
+  period: PeriodKey;
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
   label: string;
   from: string | null;
   to: string;

@@ -13,6 +13,7 @@ import {
 } from '@/lib/event-types';
 import type { MeterThresholds } from '@/lib/threshold-types';
 import type { ApiErrorPayload } from '@/lib/types';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import { EventChart } from './LazyCharts';
 import { InfoTooltip } from './InfoTooltip';
@@ -56,6 +57,8 @@ const TYPE_FILTERS: { value: EventType | 'ALL'; label: string }[] = [
 ];
 
 export function EventsView() {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   const [onlyActive, setOnlyActive] = useState(false);
@@ -66,7 +69,11 @@ export function EventsView() {
 
   const fetchEvents = useCallback(async () => {
     try {
+<<<<<<< HEAD
       const response = await meterFetch('/api/meter/events', { cache: 'no-store' });
+=======
+      const response = await fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' });
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       const payload = await response.json();
 
       if (!response.ok) {
@@ -79,7 +86,7 @@ export function EventsView() {
     } catch {
       setError({ error: 'No se pudo contactar al servidor.' });
     }
-  }, []);
+  }, [deviceId]);
 
   usePolling(fetchEvents, POLL_INTERVAL_MS);
 

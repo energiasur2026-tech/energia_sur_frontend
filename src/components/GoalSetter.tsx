@@ -1,4 +1,5 @@
 'use client';
+<<<<<<< HEAD
 import { useEffect,useRef,useState } from 'react';
 import { meterFetch } from '@/lib/meter-fetch';
 import { formatCurrency,formatNumber } from '@/lib/format';
@@ -43,4 +44,203 @@ export function GoalSetter({goal,choice,tariff,onSaved,preview=false}:{preview?:
  </form>}
  {currentTariff&&<details className="text-xs text-muted mt-4"><summary className="cursor-pointer">Tarifa y cargos incluidos</summary><div className="mt-3 space-y-2"><p>{currentTariff.category}. Vigencia: {currentTariff.effectiveDate??'no registrada'}.</p><p>Incluye: {currentTariff.included.join(', ')}.</p><p>No incluye: {currentTariff.excluded.join(', ')}.</p><p>{currentTariff.note}</p>{!currentTariff.valid&&<p>No hay tarifa válida: el objetivo en kWh sigue disponible.</p>}</div></details>}
  </section>;
+=======
+
+import { useState } from 'react';
+import { Target, Trash2 } from 'lucide-react';
+import { formatCurrency, formatNumber } from '@/lib/format';
+import type { GoalInputMode, GoalProgress } from '@/lib/goal';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
+import type { MeterRole } from '@/domain/meter-role';
+import { InfoTooltip } from './InfoTooltip';
+
+/**
+ * Definición de la meta mensual.
+ *
+ * En un medidor central se puede escribir en kWh o en pesos, porque la gente
+ * piensa su factura de las dos maneras. En pesos se convierte con el cuadro
+ * tarifario del lado del servidor: acá solo se elige la unidad.
+ *
+ * En un medidor de área la única unidad es el kWh. Un área no es una factura
+ * aparte —el cargo fijo se paga una vez por instalación— así que "que la
+ * factura no pase de" no significa nada ahí.
+ */
+export function GoalSetter({
+  goal,
+  role,
+  onSaved,
+}: {
+  goal: GoalProgress;
+  role: MeterRole;
+  onSaved: () => void;
+}) {
+  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
+  const deviceId = useMeterId();
+  const isArea = role === 'area';
+  const [open, setOpen] = useState(goal.status === 'no_goal');
+  const [mode, setMode] = useState<GoalInputMode>(isArea ? 'kwh' : goal.inputMode);
+  const [value, setValue] = useState(() => initialValue(goal));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save(nextValue: number | null) {
+    setSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(apiUrl('/api/meter/goal', deviceId), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, value: nextValue }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload.error ?? 'No se pudo guardar el objetivo.');
+        return;
+      }
+
+      setOpen(false);
+      onSaved();
+    } catch {
+      setError('No se pudo contactar al servidor.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-accent" />
+            <span className="text-sm text-muted">Tu objetivo del mes:</span>
+            <strong className="text-sm">
+              {formatNumber(goal.goalKwh, 0)} kWh
+              {!isArea && goal.goalCostArs !== null && (
+                <span className="font-normal text-muted"> · ≈ {formatCurrency(goal.goalCostArs)}</span>
+              )}
+            </strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="text-xs font-semibold text-accent hover:underline"
+          >
+            Cambiar objetivo
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-accent/40 bg-surface p-4 md:p-5 lg:p-6 mb-6">
+      <div className="flex items-center gap-2 mb-1">
+        <Target className="h-4 w-4 text-accent" />
+        <h2 className="text-sm font-semibold">
+          {goal.status === 'no_goal' ? 'Ponete un objetivo mensual' : 'Cambiar tu objetivo'}
+        </h2>
+        <InfoTooltip title="Tu objetivo mensual" text="Es cuánto querés gastar de luz este mes. Con eso, la app te dice cuánto podés consumir por día y te avisa si te estás pasando, con tiempo para corregir." />
+      </div>
+      <p className="text-xs text-muted leading-relaxed mb-4">
+        {isArea
+          ? 'El objetivo de un sector se fija en energía: es lo que ese lugar consume, no una factura aparte.'
+          : 'Escribilo como te resulte natural: en pesos, si pensás en la factura, o en kWh si mirás el consumo. Es lo mismo, convertido con el cuadro tarifario.'}
+      </p>
+
+      {error && (
+        <p className="mb-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
+
+      {/* En un área no hay unidad que elegir: mostrar un selector de una sola
+          opción sería ofrecer una decisión que no existe. */}
+      {!isArea && (
+      <div className="flex gap-1 rounded-xl bg-surface-raised p-1 mb-4 w-fit">
+        {(['ars', 'kwh'] as GoalInputMode[]).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setMode(option)}
+            className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors ${
+              mode === option ? 'bg-accent text-white' : 'text-muted hover:text-foreground'
+            }`}
+          >
+            {option === 'ars' ? 'En pesos' : 'En kWh'}
+          </button>
+        ))}
+      </div>
+      )}
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed) || parsed <= 0) {
+            setError('Ingresá un número mayor a cero.');
+            return;
+          }
+          save(parsed);
+        }}
+        className="flex flex-wrap items-end gap-3"
+      >
+        <label className="flex-1 min-w-[10rem]">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {mode === 'ars' ? 'Quiero que la factura no pase de' : 'Quiero consumir como máximo'}
+          </span>
+          <span className="relative mt-1.5 flex items-center">
+            {mode === 'ars' && (
+              <span className="absolute left-3 text-sm text-muted">$</span>
+            )}
+            <input
+              type="number"
+              inputMode="decimal"
+              min={1}
+              step="any"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={mode === 'ars' ? '30000' : '150'}
+              className={`w-full rounded-xl border border-border-soft bg-surface-raised py-2.5 pr-14 text-sm text-foreground outline-none focus:border-accent ${
+                mode === 'ars' ? 'pl-7' : 'pl-3'
+              }`}
+            />
+            <span className="absolute right-3 text-xs text-muted">
+              {mode === 'ars' ? 'por mes' : 'kWh'}
+            </span>
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-50"
+        >
+          {saving ? 'Guardando…' : 'Guardar objetivo'}
+        </button>
+
+        {goal.status !== 'no_goal' && (
+          <button
+            type="button"
+            onClick={() => save(null)}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border-soft px-3 py-2.5 text-xs font-medium text-muted transition-colors hover:text-danger"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Quitar
+          </button>
+        )}
+      </form>
+    </section>
+  );
+}
+
+function initialValue(goal: GoalProgress): string {
+  if (goal.goalKwh === null) return '';
+  return goal.inputMode === 'ars' && goal.goalCostArs !== null
+    ? String(Math.round(goal.goalCostArs))
+    : String(Math.round(goal.goalKwh));
+>>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
 }

@@ -4,6 +4,7 @@ import { CheckCircle2, Lightbulb, TriangleAlert } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import type { GoalProgress, GoalStatus } from '@/lib/goal';
 import type { Recommendation } from '@/lib/recommendations';
+import type { MeterRole } from '@/domain/meter-role';
 import { InfoTooltip } from './InfoTooltip';
 import { ValueFade } from './ValueFade';
 import { MonthChart } from './LazyCharts';
@@ -40,10 +41,12 @@ const STATUS: Record<
 
 export function GoalPanel({
   goal,
+  role,
   monthDaily,
   recommendations,
 }: {
   goal: GoalProgress;
+  role: MeterRole;
   monthDaily: MonthDailyPoint[];
   recommendations: Recommendation[];
 }) {
@@ -128,13 +131,25 @@ export function GoalPanel({
             hint="para el resto del mes"
             tip="Cuánto podés consumir por día de acá en adelante para todavía llegar al objetivo. Si ya te pasaste, muestra cero."
           />
-          <Kpi
-            label="Terminarías pagando"
-            value={formatCurrency(goal.projectedCostArs)}
-            hint={`objetivo: ${formatCurrency(goal.goalCostArs)}`}
-            tone={goal.status === 'on_track' ? 'ok' : 'warn'}
-            tip="Cuánto saldría la parte de energía de tu factura si seguís consumiendo al ritmo de este mes. No incluye agua ni cloaca."
-          />
+          {/* En un área el cierre del mes se lee en energía: su consumo no es
+              una factura, y el cargo fijo no le corresponde. */}
+          {role === 'area' ? (
+            <Kpi
+              label="Terminarías consumiendo"
+              value={`${formatNumber(goal.projectedMonthKwh, 1)} kWh`}
+              hint={`objetivo: ${formatNumber(goal.goalKwh, 0)} kWh`}
+              tone={goal.status === 'on_track' ? 'ok' : 'warn'}
+              tip="Cuánta electricidad va a consumir este sector en el mes si sigue al ritmo actual."
+            />
+          ) : (
+            <Kpi
+              label="Terminarías pagando"
+              value={formatCurrency(goal.projectedCostArs)}
+              hint={`objetivo: ${formatCurrency(goal.goalCostArs)}`}
+              tone={goal.status === 'on_track' ? 'ok' : 'warn'}
+              tip="Cuánto saldría la parte de energía de tu factura si seguís consumiendo al ritmo de este mes. No incluye agua ni cloaca."
+            />
+          )}
         </dl>
       </section>
 
