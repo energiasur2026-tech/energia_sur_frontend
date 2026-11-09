@@ -761,6 +761,24 @@ function StepDetail({
 }) {
   const { singular, plural, prompt, suggestions } = definition.subdivision;
 
+  /**
+   * El grado que corresponde a este tipo de lugar.
+   *
+   * Se marca aunque no esté elegido. Preseleccionarlo no alcanza: cuando el
+   * medidor ya tiene umbrales propios no se preselecciona nada —para no
+   * pisarlos— y entonces quien no sabe qué elegir se queda sin ninguna pista.
+   * La marca responde la pregunta que de verdad tiene: "¿cuál me conviene?".
+   */
+  const sugerido = suggestedFor(definition.type);
+
+  /**
+   * Cómo se nombra el lugar en la marca de recomendado.
+   *
+   * Los tipos "Otra" darían "recomendado para otra", que no dice nada. Ahí la
+   * marca va sola: igual se entiende cuál es la sugerida.
+   */
+  const nombreDelLugar = definition.label === 'Otra' ? null : definition.label.toLowerCase();
+
   const pending = suggestions.filter(
     (name) => !draft.rooms.some((room) => room.name.toLowerCase() === name.toLowerCase())
   );
@@ -879,15 +897,22 @@ function StepDetail({
 
       <section className="mb-8">
         <div className="flex items-center gap-1.5 mb-2.5">
-          <FieldLabel className="mb-0">¿Cuánto querés enterarte?</FieldLabel>
+          <FieldLabel className="mb-0">Sensibilidad de los avisos</FieldLabel>
           <InfoTooltip
             title="Sensibilidad de las alertas"
             text="Define cuán lejos de los 220 V tiene que irse la tensión para que se registre una anomalía. Es un umbral de aviso del producto, no un límite normativo: salir del rango elegido no significa que haya peligro, significa que pediste enterarte."
           />
         </div>
+        {/* Los rangos no significan nada sin un punto de referencia: alguien
+            que ve "205–235 V" por primera vez no tiene cómo saber si es
+            amplio o estrecho. Nombrar los 220 V es lo que vuelve legibles las
+            tres opciones, y decir que llega un email explica para qué sirve
+            elegir. */}
         <p className="text-xs text-muted leading-relaxed mb-3">
-          Lo proponemos según el lugar que elegiste. Podés cambiarlo ahora o
-          más adelante desde Ajustes.
+          La electricidad llega normalmente a{' '}
+          <b className="text-foreground">220 V</b>. Cuando se aleja de ese valor
+          puede dañar aparatos, y te avisamos por email. Elegí cuánto puede
+          alejarse antes de que te avisemos.
         </p>
 
         <div className="space-y-2">
@@ -912,21 +937,37 @@ function StepDetail({
                     onChange={() => onSensitivity(option)}
                   />
                   <span>
-                    <span className="block text-sm font-medium">
-                      {SENSITIVITY_LABEL[option]}
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {SENSITIVITY_LABEL[option]}
+                      </span>
+                      {option === sugerido && (
+                        <span className="inline-flex items-center rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+                          {nombreDelLugar ? `Recomendado para ${nombreDelLugar}` : 'Recomendado'}
+                        </span>
+                      )}
                     </span>
                     <span className="block text-xs text-muted leading-relaxed">
                       {SENSITIVITY_DESCRIPTION[option]}
+
                     </span>
                   </span>
                 </span>
-                <span className="text-xs text-muted tabular-nums shrink-0">
-                  {range.lowVoltageV}–{range.highVoltageV} V
+                <span className="text-xs text-muted shrink-0 text-right">
+                  avisa fuera de
+                  <br />
+                  <b className="tabular-nums text-foreground">
+                    {range.lowVoltageV}–{range.highVoltageV} V
+                  </b>
                 </span>
               </label>
             );
           })}
         </div>
+
+        <p className="mt-3 text-xs text-muted leading-relaxed">
+          Podés cambiarlo cuando quieras desde Ajustes.
+        </p>
 
         {/* Unos umbrales puestos a mano son una decisión, no un descuido: se
             respetan salvo que el usuario elija otra cosa acá. */}

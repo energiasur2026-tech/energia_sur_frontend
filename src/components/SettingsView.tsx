@@ -416,8 +416,9 @@ export function SettingsView() {
           />
         </div>
         <p className="text-xs text-muted leading-relaxed mb-4">
-          Cuánto querés enterarte. A mayor sensibilidad, más angosto el rango
-          que se considera normal, y más avisos.
+          Cuándo querés que te avisemos si la tensión se va de lo normal. A
+          mayor sensibilidad, más angosto el rango que se considera normal, y
+          más avisos.
         </p>
 
         <div className="space-y-2">
