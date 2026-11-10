@@ -1,5 +1,4 @@
 'use client';
-import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useState } from 'react';
 import { Bell, Check, Database, Gauge, MapPin, Palette, Save, SlidersHorizontal } from 'lucide-react';
@@ -11,6 +10,7 @@ import {
 import { PHASE_LABEL, type MeterPhases } from '@/domain/installation-types';
 import { MAX_AREA_LABEL_LENGTH, ROLE_LABEL, type MeterRole } from '@/domain/meter-role';
 import {
+  THRESHOLD_LIMITS,
   SELECTABLE_SENSITIVITIES,
   SENSITIVITY_DESCRIPTION,
   SENSITIVITY_LABEL,
@@ -53,17 +53,17 @@ export function SettingsView() {
   const [savingPlacement, setSavingPlacement] = useState(false);
   /** Grado elegido que todavía espera confirmación, por pisar umbrales a mano. */
   const [pendingSensitivity, setPendingSensitivity] = useState<Sensitivity | null>(null);
+  /** Formulario de umbrales propios: `null` mientras está cerrado. */
+  const [ownRange, setOwnRange] = useState<{ low: string; high: string } | null>(null);
+  const [savingRange, setSavingRange] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const fetchSettings = useCallback(async () => {
     try {
-<<<<<<< HEAD
-      const response = await meterFetch('/api/meter/settings', { cache: 'no-store' });
-=======
       const response = await fetch(apiUrl('/api/meter/settings', deviceId), { cache: 'no-store' });
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       const payload = await response.json();
 
       if (!response.ok) {
@@ -91,11 +91,7 @@ export function SettingsView() {
     setSettings((current) => (current ? { ...current, alertsEnabled: enabled } : current));
 
     try {
-<<<<<<< HEAD
-      const response = await meterFetch('/api/meter/settings', {
-=======
       const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alertsEnabled: enabled }),
@@ -228,17 +224,88 @@ export function SettingsView() {
     }
   }
 
+  /**
+   * Umbrales escritos a mano.
+   *
+   * Existe porque elegir un grado era una puerta de ida: el medidor real tenía
+   * la tolerancia de ±8% del ENRE —202,4 a 237,6 V, que no coincide con
+   * ningún grado— y recuperarla después de un toque exploratorio exigió
+   * tocar la base a mano, tres veces. El backend ya acepta valores
+   * explícitos; esto es la pantalla que faltaba.
+   *
+   * La validación se repite acá para responder sin ida y vuelta, pero el
+   * servidor es el que manda: sus mensajes se muestran tal cual.
+   */
+  async function onSaveOwnRange() {
+    if (!ownRange) return;
+
+    const low = Number(ownRange.low.replace(',', '.'));
+    const high = Number(ownRange.high.replace(',', '.'));
+    const { voltage, minSpanV } = THRESHOLD_LIMITS;
+
+    if (!Number.isFinite(low) || !Number.isFinite(high)) {
+      setRangeError('Escribí los dos valores en volts.');
+      return;
+    }
+    if (low < voltage.min || high > voltage.max) {
+      setRangeError(`Los valores deben estar entre ${voltage.min} y ${voltage.max} V.`);
+      return;
+    }
+    if (low >= high) {
+      setRangeError('El valor de abajo tiene que ser menor que el de arriba.');
+      return;
+    }
+    if (high - low < minSpanV) {
+      setRangeError(
+        `Entre un valor y otro tiene que haber al menos ${minSpanV} V, o una anomalía nunca podría darse por terminada.`
+      );
+      return;
+    }
+
+    setSavingRange(true);
+    setRangeError(null);
+
+    try {
+      const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thresholds: { lowVoltageV: low, highVoltageV: high } }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setRangeError(payload.error ?? 'No se pudo guardar.');
+        return;
+      }
+
+      // El grado lo deduce el servidor de los números: unos umbrales que
+      // coinciden con un preset SON ese grado, los haya escrito el usuario o
+      // elegido de la lista. Por eso se toma de la respuesta y no se asume.
+      setSettings((current) =>
+        current
+          ? {
+              ...current,
+              sensitivity: payload.sensitivity as Sensitivity,
+              thresholds: { ...current.thresholds, ...payload.thresholds },
+            }
+          : current
+      );
+      setOwnRange(null);
+      setError(null);
+    } catch {
+      setRangeError('No se pudo contactar al servidor.');
+    } finally {
+      setSavingRange(false);
+    }
+  }
+
   async function onSave() {
     if (selected === null) return;
     setSaving(true);
     setSavedAt(null);
 
     try {
-<<<<<<< HEAD
-      const response = await meterFetch('/api/meter/settings', {
-=======
       const response = await fetch(apiUrl('/api/meter/settings', deviceId), {
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ collectionIntervalMinutes: selected }),
@@ -428,10 +495,16 @@ export function SettingsView() {
             text="Define cuán lejos de los 220 V tiene que irse la tensión para que se registre una anomalía. Es un umbral de aviso del producto, no un límite normativo: salir del rango elegido no significa que haya peligro, significa que pediste enterarte."
           />
         </div>
+        {/* El mismo texto que el asistente, palabra por palabra. Si acá
+            dijera otra cosa, serían dos explicaciones distintas de lo mismo
+            para la misma persona. Los rangos no se entienden sin nombrar los
+            220 V: sin esa referencia, "205–235 V" no dice si es amplio o
+            estrecho. */}
         <p className="text-xs text-muted leading-relaxed mb-4">
-          Cuándo querés que te avisemos si la tensión se va de lo normal. A
-          mayor sensibilidad, más angosto el rango que se considera normal, y
-          más avisos.
+          La electricidad llega normalmente a{' '}
+          <b className="text-foreground">220 V</b>: eso es la tensión. Cuando se
+          aleja de ese valor puede dañar aparatos, y te avisamos por email.
+          Elegí cuánto puede alejarse antes de que te avisemos.
         </p>
 
         <div className="space-y-2">
@@ -465,27 +538,142 @@ export function SettingsView() {
                     </span>
                   </span>
                 </span>
-                <span className="text-xs text-muted tabular-nums shrink-0">
-                  {range.lowVoltageV}–{range.highVoltageV} V
+                <span className="text-xs text-muted shrink-0 text-right">
+                  avisa fuera de
+                  <br />
+                  <b className="tabular-nums text-foreground">
+                    {range.lowVoltageV}–{range.highVoltageV} V
+                  </b>
                 </span>
               </label>
             );
           })}
         </div>
 
-        {/* `personalizada` no se elige: se hereda de unos umbrales ajustados a
-            mano. Mostrarla como opción invitaría a seleccionarla, y no hay
-            nada que seleccionar. */}
-        {settings?.sensitivity === 'personalizada' && (
+        {/* `personalizada` no aparece entre los tres grados: no es algo que se
+            elija, es lo que resulta de escribir valores propios. Por eso se
+            informa acá, junto al formulario que la produce. */}
+        {settings?.sensitivity === 'personalizada' && ownRange === null && (
           <p className="mt-3 rounded-xl border border-border-soft bg-surface-raised px-4 py-3 text-xs text-muted leading-relaxed">
             <b className="text-foreground">{SENSITIVITY_LABEL.personalizada}:</b>{' '}
             {SENSITIVITY_DESCRIPTION.personalizada} Hoy avisa fuera de{' '}
             <b className="text-foreground tabular-nums">
               {settings.thresholds.lowVoltageV}–{settings.thresholds.highVoltageV} V
             </b>
-            . Si elegís uno de los grados de arriba, esos umbrales se
-            reemplazan.
+            . Si elegís uno de los grados de arriba, esos valores se reemplazan.
           </p>
+        )}
+
+        {/* Elegir los propios valores.
+            Va al final y sin destacarse: la inmensa mayoría elige uno de los
+            tres grados, y pedir dos números en volts a quien no los tiene es
+            una forma de trabar el alta. Pero quien los tiene —una tolerancia
+            de distribuidora, un equipo con su hoja de datos— necesita poder
+            escribirlos sin tocar la base de datos. */}
+        {ownRange === null ? (
+          <button
+            type="button"
+            disabled={!settings}
+            onClick={() => {
+              setRangeError(null);
+              setOwnRange({
+                low: String(settings?.thresholds.lowVoltageV ?? ''),
+                high: String(settings?.thresholds.highVoltageV ?? ''),
+              });
+            }}
+            className="mt-3 text-xs font-semibold text-accent transition-opacity hover:underline disabled:opacity-40"
+          >
+            Prefiero elegir mis propios valores
+          </button>
+        ) : (
+          <div className="mt-3 rounded-xl border border-accent/40 bg-surface-raised px-4 py-4 animate-fade-in">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-semibold">Tus propios valores</p>
+              <InfoTooltip
+                title="Cuándo conviene"
+                text="Si tu distribuidora publica una tolerancia distinta, o un equipo tuyo tiene un rango de trabajo que querés respetar, escribilos acá. Si no, cualquiera de los tres grados de arriba sirve."
+              />
+            </div>
+            <p className="text-xs text-muted leading-relaxed mb-4">
+              Te avisamos cuando la tensión salga de este rango. Tiene que estar
+              entre {THRESHOLD_LIMITS.voltage.min} y {THRESHOLD_LIMITS.voltage.max} V,
+              y haber al menos {THRESHOLD_LIMITS.minSpanV} V entre un valor y el otro.
+            </p>
+
+            {rangeError && (
+              <p className="mb-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger leading-relaxed">
+                {rangeError}
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-end gap-3 mb-4">
+              <label className="flex-1 min-w-[8rem]">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-muted">
+                  Avisar si baja de
+                </span>
+                <span className="relative mt-1.5 flex items-center">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    value={ownRange.low}
+                    onChange={(event) =>
+                      setOwnRange((current) =>
+                        current ? { ...current, low: event.target.value } : current
+                      )
+                    }
+                    placeholder="202.4"
+                    className="h-11 w-full rounded-xl border border-border-soft bg-surface px-3 pr-8 text-sm tabular-nums text-foreground outline-none focus:border-accent"
+                  />
+                  <span className="absolute right-3 text-xs text-muted">V</span>
+                </span>
+              </label>
+
+              <label className="flex-1 min-w-[8rem]">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-muted">
+                  Avisar si sube de
+                </span>
+                <span className="relative mt-1.5 flex items-center">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    value={ownRange.high}
+                    onChange={(event) =>
+                      setOwnRange((current) =>
+                        current ? { ...current, high: event.target.value } : current
+                      )
+                    }
+                    placeholder="237.6"
+                    className="h-11 w-full rounded-xl border border-border-soft bg-surface px-3 pr-8 text-sm tabular-nums text-foreground outline-none focus:border-accent"
+                  />
+                  <span className="absolute right-3 text-xs text-muted">V</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={onSaveOwnRange}
+                disabled={savingRange}
+                className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {savingRange ? 'Guardando…' : 'Guardar mis valores'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOwnRange(null);
+                  setRangeError(null);
+                }}
+                className="text-xs font-semibold text-muted transition-colors hover:text-foreground"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         )}
       </section>
 

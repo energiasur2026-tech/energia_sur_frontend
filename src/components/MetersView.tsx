@@ -294,20 +294,12 @@ function MeterCard({ meter, onUnlink }: { meter: MeterSummary; onUnlink: () => v
         />
       </div>
 
-<<<<<<< HEAD
-      <HomeStatus home={meter.home} meterId={meter.deviceId} />
-=======
       <HomeStatus home={meter.home} deviceId={meter.deviceId} />
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
 
       {/* Los enlaces llevan el medidor de esta tarjeta: sin eso, con más de
           uno vinculado, "Ir a mi medidor" abriría siempre el primero. */}
       <Link
-<<<<<<< HEAD
-        href={`/dashboard?meterId=${encodeURIComponent(meter.deviceId)}`}
-=======
         href={meterHref('/dashboard', meter.deviceId)}
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85"
       >
         Ir a mi medidor
@@ -339,11 +331,7 @@ function MeterCard({ meter, onUnlink }: { meter: MeterSummary; onUnlink: () => v
  * —cuantos ambientes y aparatos hay— y el enlace baja a secundario, porque ya
  * no hay nada que reclamarle al usuario.
  */
-<<<<<<< HEAD
-function HomeStatus({ home, meterId }: { home: HomeSummary; meterId: string }) {
-=======
 function HomeStatus({ home, deviceId }: { home: HomeSummary; deviceId: string }) {
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
   return (
     <div className="mb-4 space-y-2">
       <div
@@ -374,11 +362,7 @@ function HomeStatus({ home, deviceId }: { home: HomeSummary; deviceId: string })
           medidor", que ya es un boton lleno. Dos botones llenos del mismo color
           compiten entre si y ninguno de los dos termina destacando. */}
       <Link
-<<<<<<< HEAD
-        href={`/medidores/hogar?meterId=${encodeURIComponent(meterId)}`}
-=======
         href={meterHref('/medidores/hogar', deviceId)}
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
           home.configured
             ? 'bg-surface-raised text-muted hover:text-foreground'

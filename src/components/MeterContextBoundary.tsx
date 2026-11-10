@@ -1,12 +1,12 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useMeterId } from '@/lib/use-meter-id';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
 /** Unmount previous requests and visible tenant data before changing identity or meter. */
 export function MeterContextBoundary({ userId, children }: { userId: string; children: React.ReactNode }) {
-  const search = useSearchParams();
-  const meter = search.get('meterId') ?? '';
+  const meter = useMeterId() ?? '';
   const router = useRouter();
   const [invalidIdentity, setInvalidIdentity] = useState(false);
   useEffect(() => {

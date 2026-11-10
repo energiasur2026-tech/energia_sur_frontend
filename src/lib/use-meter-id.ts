@@ -1,6 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { selectedDeviceId, withMeterSelection } from './meter-selection';
 
 /**
  * De qué medidor habla la pantalla que se está mirando.
@@ -19,8 +20,7 @@ import { useSearchParams } from 'next/navigation';
  */
 export function useMeterId(): string | null {
   const params = useSearchParams();
-  const id = params.get('deviceId');
-  return id && id.trim() !== '' ? id : null;
+  return selectedDeviceId(params);
 }
 
 /**
@@ -31,12 +31,10 @@ export function useMeterId(): string | null {
  * silenciosamente trabaja sobre otro medidor. Eso es peor que un error.
  */
 export function apiUrl(path: string, deviceId: string | null): string {
-  if (!deviceId) return path;
-  const separador = path.includes('?') ? '&' : '?';
-  return `${path}${separador}deviceId=${encodeURIComponent(deviceId)}`;
+  return withMeterSelection(path, deviceId);
 }
 
-/** Lo mismo para un enlace entre pantallas, así la elección viaja al navegar. */
+/** Carry the canonical selection between pages, while accepting older incoming links. */
 export function meterHref(path: string, deviceId: string | null): string {
-  return apiUrl(path, deviceId);
+  return withMeterSelection(path, deviceId, false);
 }

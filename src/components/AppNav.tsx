@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Gauge,
   LayoutGrid,
@@ -98,8 +98,6 @@ function TopNav({
   userEmail: string | null;
   onLogout: () => void;
 }) {
-  const meter = useSearchParams().get('meterId');
-  const selectedMeterUrl = (href: string) => meter ? href + '?meterId=' + encodeURIComponent(meter) : href;
   return (
     <nav className="hidden md:block border-b border-border-soft bg-surface">
       <div className="max-w-6xl mx-auto px-6 lg:px-8 flex items-center justify-between gap-4">
@@ -109,11 +107,7 @@ function TopNav({
             return (
               <Link
                 key={href}
-<<<<<<< HEAD
-                href={selectedMeterUrl(href)}
-=======
                 href={meterHref(href, deviceId)}
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
                 aria-current={active ? 'page' : undefined}
                 className={`inline-flex items-center gap-2 px-3.5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   active
@@ -151,13 +145,7 @@ function TopNav({
  * app nativa. Sin menú hamburguesa — las seis secciones están siempre a la
  * vista, que es la diferencia entre sentirse app y sentirse web achicada.
  */
-<<<<<<< HEAD
-function BottomNav({ pathname }: { pathname: string }) {
-  const meter = useSearchParams().get('meterId');
-  const selectedMeterUrl = (href: string) => meter ? href + '?meterId=' + encodeURIComponent(meter) : href;
-=======
 function BottomNav({ pathname, deviceId }: { pathname: string; deviceId: string | null }) {
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border-soft bg-surface"
@@ -171,11 +159,7 @@ function BottomNav({ pathname, deviceId }: { pathname: string; deviceId: string 
           return (
             <li key={href}>
               <Link
-<<<<<<< HEAD
-                href={selectedMeterUrl(href)}
-=======
                 href={meterHref(href, deviceId)}
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
                 aria-current={active ? 'page' : undefined}
                 className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${
                   active ? 'text-accent' : 'text-muted'

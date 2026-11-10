@@ -1,5 +1,4 @@
 'use client';
-import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useRef, useState } from 'react';
 import { Activity, Eye, EyeOff, Gauge, Plug, RefreshCw, Target, TriangleAlert, Zap } from 'lucide-react';
@@ -11,7 +10,7 @@ import { MetricCard } from './MetricCard';
 import { SetupNotice } from './SetupNotice';
 import { formatClock, formatDateTime, formatNumber, NO_DATA } from '@/lib/format';
 import { DEFAULT_RANGE, RANGES, RANGE_KEYS, type RangeKey } from '@/lib/ranges';
-import { apiUrl, useMeterId } from '@/lib/use-meter-id';
+import { apiUrl, meterHref, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import type { EventRecord } from '@/lib/event-types';
 import type { GoalProgress } from '@/lib/goal';
@@ -55,11 +54,7 @@ export function Dashboard() {
 
   const fetchLive = useCallback(async () => {
     try {
-<<<<<<< HEAD
-      const response = await meterFetch('/api/meter/live', { cache: 'no-store' });
-=======
       const response = await fetch(apiUrl('/api/meter/live', deviceId), { cache: 'no-store' });
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       const payload = await response.json();
 
       if (!response.ok) {
@@ -81,11 +76,7 @@ export function Dashboard() {
     lastHistoryRequest.current = requestId;
 
     try {
-<<<<<<< HEAD
-      const response = await meterFetch(`/api/meter/history?range=${key}`, { cache: 'no-store' });
-=======
       const response = await fetch(apiUrl(`/api/meter/history?range=${key}`, deviceId), { cache: 'no-store' });
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       const payload = await response.json();
       if (!response.ok) return;
       // Descarta la respuesta si mientras tanto se pidió otro rango.
@@ -104,13 +95,8 @@ export function Dashboard() {
   const fetchContext = useCallback(async () => {
     try {
       const [forecastResponse, eventsResponse] = await Promise.all([
-<<<<<<< HEAD
-        meterFetch('/api/meter/forecast', { cache: 'no-store' }),
-        meterFetch('/api/meter/events', { cache: 'no-store' }),
-=======
         fetch(apiUrl('/api/meter/forecast', deviceId), { cache: 'no-store' }),
         fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' }),
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       ]);
 
       if (!forecastResponse.ok || !eventsResponse.ok) return;
@@ -221,7 +207,7 @@ export function Dashboard() {
           tip="Es la meta de consumo que vos elegís para el mes. La app la usa para avisarte si vas bien o si te estás pasando, con tiempo para corregir antes de que llegue la factura."
           action={{
             label: context.goal?.goalKwh ? 'Ver mi objetivo' : 'Configurar objetivo',
-            href: '/proyeccion',
+            href: meterHref('/proyeccion', deviceId),
           }}
         />
         <MetricCard
@@ -232,7 +218,7 @@ export function Dashboard() {
           hint={activeEvents.length > 0 ? 'en curso ahora' : `${context.events.length} en el historial`}
           tone={activeEvents.length > 0 ? 'danger' : 'ok'}
           tip="Son problemas detectados en tu instalación: que la tensión se haya ido por debajo o por encima de lo normal, o que el medidor haya dejado de reportar. Cada uno queda registrado con su horario y duración."
-          action={{ label: 'Ver eventos', href: '/eventos' }}
+          action={{ label: 'Ver eventos', href: meterHref('/eventos', deviceId) }}
         />
       </section>
 

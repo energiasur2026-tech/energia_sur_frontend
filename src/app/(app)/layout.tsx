@@ -34,14 +34,10 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     // el final del contenido no quede tapado detrás de ella.
     <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><div className="flex-1 flex flex-col pb-nav">
       <AppNav userEmail={user.email} />
-<<<<<<< HEAD
+      <MeterGoneBanner />
       <div className="flex flex-1 flex-col pb-40">
         <PageTransition>{children}</PageTransition>
       </div>
-=======
-      <MeterGoneBanner />
-      <PageTransition>{children}</PageTransition>
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
       {/* Va en el layout y no en una pantalla: aparece al entrar a la app, sea
           cual sea la seccion a la que se llegue despues del login. */}
       <WelcomeDialog />

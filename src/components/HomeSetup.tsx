@@ -1,5 +1,4 @@
 'use client';
-import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -146,10 +145,6 @@ export function HomeSetup() {
 
   const load = useCallback(async () => {
     try {
-<<<<<<< HEAD
-      const response = await meterFetch('/api/meter/home', { cache: 'no-store' });
-      const payload = await response.json();
-=======
       // El contexto y la ubicación del medidor viven en rutas distintas, pero
       // el asistente necesita las dos para armar el borrador: el rol decide
       // qué tipos de lugar se ofrecen.
@@ -161,7 +156,6 @@ export function HomeSetup() {
         homeRes.json(),
         settingsRes.json(),
       ]);
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
 
       if (!homeRes.ok) {
         setError(homePayload as ApiErrorPayload);
@@ -304,15 +298,11 @@ export function HomeSetup() {
     setSaving(true);
 
     try {
-<<<<<<< HEAD
-      const response = await meterFetch('/api/meter/home', {
-=======
       // Primero la ubicación: el guardado del contexto valida que el tipo le
       // corresponda al rol que el medidor tiene en la base. Si fuera al
       // revés, cambiar de central a área y elegir "garage" en la misma
       // pasada daría un 400.
       const placement = await fetch(apiUrl('/api/meter/settings', deviceId), {
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

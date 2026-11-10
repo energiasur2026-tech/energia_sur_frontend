@@ -1,5 +1,4 @@
 'use client';
-import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useState } from 'react';
 import {
@@ -54,11 +53,7 @@ export function EventChart({
         from: event.startedAt,
         to: event.endedAt ?? new Date().toISOString(),
       });
-<<<<<<< HEAD
-      const response = await meterFetch(`/api/meter/event-series?${params}`, { cache: 'no-store' });
-=======
       const response = await fetch(apiUrl(`/api/meter/event-series?${params}`, deviceId), { cache: 'no-store' });
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
 
       if (!response.ok) {
         setFailed(true);

@@ -24,13 +24,8 @@ const REASON_MESSAGE: Record<string, string> = {
 };
 
 export function ConsumptionView() {
-<<<<<<< HEAD
-  const [period, setPeriod] = useState<PeriodKey | 'billing'>(DEFAULT_PERIOD);
-=======
-  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
   const deviceId = useMeterId();
-  const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PERIOD);
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
+  const [period, setPeriod] = useState<PeriodKey | 'billing'>(DEFAULT_PERIOD);
   const [data, setData] = useState<ConsumptionPayload | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   const [closedOn,setClosedOn]=useState('');
@@ -41,11 +36,7 @@ export function ConsumptionView() {
   const fetchConsumption = useCallback(async () => {
     const id=++requestId.current;
     try {
-<<<<<<< HEAD
-      const response = await meterFetch(`/api/meter/consumption?period=${period}`, {
-=======
       const response = await fetch(apiUrl(`/api/meter/consumption?period=${period}`, deviceId), {
->>>>>>> 7f21ccba3e0b56e6065aa996f9b48d8a51260d79
         cache: 'no-store',
       });
       const payload = await response.json();
