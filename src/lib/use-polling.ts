@@ -50,12 +50,14 @@ export function usePolling(task: () => void, intervalMs: number) {
     const initial = setTimeout(run, 0);
     if (!document.hidden) start();
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('energia:configuration-changed',run);
 
     return () => {
       cancelled = true;
       clearTimeout(initial);
       stop();
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('energia:configuration-changed',run);
     };
   }, [task, intervalMs]);
 }

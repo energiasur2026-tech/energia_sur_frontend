@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:lumi": "node --test scripts/verify-lumi-events.cjs scripts/verify-lumi-memory.cjs scripts/verify-lumi-sounds.cjs",
+    "local:stack": "node scripts/start-local-stack.cjs",
+    "test:month-chart": "node scripts/verify-month-chart.cjs",
+    "test:billing": "node scripts/verify-electricity-billing.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -20,11 +24,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "jsdom": "^31.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

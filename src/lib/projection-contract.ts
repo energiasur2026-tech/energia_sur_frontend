@@ -5,6 +5,13 @@ const nullableNumber=(v:unknown)=>v===null||typeof v==='number'&&Number.isFinite
 export function isMonthlyProjection(value:unknown):value is MonthlyProjection{
  if(!record(value)||!record(value.goal)||!record(value.tariff)||!record(value.quality)||!record(value.chart))return false;
  const {goal,tariff,quality,chart}=value;
+ if(chart.cost!==undefined&&chart.cost!==null){
+  if(!record(chart.cost))return false;
+  for(const [key,fields] of [['references',['pace','target']],['observed',['real']],['estimated',['projected']]] as const){
+   const points=chart.cost[key];
+   if(!Array.isArray(points)||!points.every(point=>record(point)&&typeof point.x==='number'&&Number.isFinite(point.x)&&fields.every(field=>nullableNumber(point[field])&&(point[field]===null||Number(point[field])>=0))))return false;
+  }
+ }
  return ['no_goal','no_data','on_track','at_risk','over'].includes(String(goal.status))
  && ['goalKwh','projectedMonthKwh','projectedCostArs','consumedKwh','dailyRateKwh','deviationKwh','remainingPerDayKwh'].every(k=>nullableNumber(goal[k]))
  && typeof tariff.valid==='boolean'&&Array.isArray(tariff.included)&&Array.isArray(tariff.excluded)

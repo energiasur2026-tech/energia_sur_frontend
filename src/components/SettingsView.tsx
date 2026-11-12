@@ -1,5 +1,7 @@
 'use client';
 
+import {MeterNameForm} from './MeterNameForm';
+import {SupplySettings} from './SupplySettings';
 import { useCallback, useState } from 'react';
 import { Bell, Check, Database, Gauge, MapPin, Palette, Save, SlidersHorizontal } from 'lucide-react';
 import {
@@ -30,6 +32,7 @@ import { SetupNotice } from './SetupNotice';
 type Settings = {
   deviceId: string;
   name: string;
+  isOwner?: boolean;
   collectionIntervalMinutes: number;
   alertsEnabled: boolean;
   thresholds: MeterThresholds;
@@ -357,12 +360,14 @@ export function SettingsView() {
         </p>
       )}
 
+      {settings&&<MeterNameForm key={settings.deviceId+settings.name} name={settings.name} isOwner={settings.isOwner===true} onSaved={()=>void fetchSettings()}/>}
+      <SupplySettings key={deviceId??'default'}/>
       <ProfileForm />
 
       <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
         <div className="flex items-center gap-2 mb-1">
           <MapPin className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Dónde está el medidor</h2>
+          <h2 className="text-sm font-semibold">Alcance de medición</h2>
           <InfoTooltip
             title="Dónde está el medidor"
             text="En el tablero central mide todo lo que consume el lugar, y su consumo se contrasta contra la factura del mes. En un área mide solo ese sector: ahí lo que importa es la energía, porque un área no es una factura aparte."
@@ -430,7 +435,7 @@ export function SettingsView() {
             className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
-            {savingPlacement ? 'Guardando…' : 'Guardar ubicación'}
+            {savingPlacement ? 'Guardando…' : 'Guardar alcance'}
           </button>
 
           {placementDirty && placement?.role !== settings?.role && (

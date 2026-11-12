@@ -122,7 +122,7 @@ export function MeterPicker() {
                       <span className="block truncate text-sm font-semibold">{meter.name}</span>
                       <span className="block truncate text-[11px] text-muted">
                         {meter.role === 'central'
-                          ? ROLE_LABEL.central
+                          ? 'Mide todo el consumo del lugar'
                           : meter.areaLabel || ROLE_LABEL.area}
                       </span>
                     </span>

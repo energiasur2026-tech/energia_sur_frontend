@@ -1,4 +1,6 @@
 'use client';
+import {ElectricityBreakdown} from './ElectricityBreakdown';
+import {TariffAndBillTools} from './TariffAndBillTools';
 import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useRef, useState } from 'react';
@@ -151,13 +153,12 @@ export function ConsumptionView() {
 
           {/* En un área el costo baja de categoría: es una referencia dentro
               de la tarjeta de energía, no un número principal al lado. */}
-          {isArea && data?.available && (
+          {isArea && data?.available && data.cost && (
             <p className="mt-4 flex items-start gap-2 border-t border-border-soft pt-3 text-xs text-muted leading-relaxed">
               <Receipt className="h-3.5 w-3.5 mt-0.5 shrink-0 text-ok" />
               <span>
                 Esto representa unos{' '}
-                <b className="text-foreground">{formatCurrency(data.cost.total)}</b> de tu
-                factura.
+                <b className="text-foreground">{formatCurrency(data.cost.total)}</b> de cargos eléctricos, antes de ajustes pendientes.
                 <InfoTooltip
                   title="De dónde sale esa referencia"
                   text="Es el precio por kWh del cuadro tarifario aplicado a lo que consumió este sector. No incluye el cargo fijo: ese se paga una vez por instalación, no por área, así que sumarlo acá daría un número inventado."
@@ -171,8 +172,8 @@ export function ConsumptionView() {
           <article className="rounded-2xl border border-border-soft bg-surface p-5 md:p-6">
             <header className="flex items-center gap-2 mb-3">
               <Receipt className="h-4 w-4 text-ok" />
-              <h2 className="text-sm font-semibold">Cuánto costaría</h2>
-              <InfoTooltip title="Cuánto costaría" text="Es lo que costaría esa electricidad según el cuadro tarifario vigente: el cargo fijo del período más el precio por cada kWh consumido. Es una estimación de la parte de energía de tu factura, no la factura completa." />
+              <h2 className="text-sm font-semibold">Referencia de cargos eléctricos</h2>
+              <InfoTooltip title="Cuánto costaría" text="Referencia de cargos fijos y variables con la versión configurada para el período. No se completa el total final si faltan bases tributarias o créditos confirmados." />
             </header>
             <p>
               <ValueFade
@@ -181,8 +182,7 @@ export function ConsumptionView() {
               />
             </p>
             <p className="mt-2 text-xs text-muted leading-relaxed">
-              Solo la parte de energía. Tu factura real suma además agua, cloaca y
-              otros conceptos que este medidor no mide.
+              Referencia antes de impuestos y créditos no confirmados. El total final eléctrico puede diferir; agua y energía pública se excluyen.
             </p>
           </article>
         )}
@@ -191,53 +191,9 @@ export function ConsumptionView() {
       {/* El desglose de la factura es del medidor central: es el que mide lo
           que factura la distribuidora. En un área, con el cargo fijo afuera,
           la tabla mostraría una factura que no existe. */}
-      {data?.available && !isArea && (
-        <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 animate-fade-in">
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-sm font-semibold">De dónde sale ese importe</h2>
-            <InfoTooltip title="De dónde sale ese importe" text="La tarifa se compone de dos partes: un cargo fijo que se paga siempre, aunque no consumas nada, y un cargo variable que depende de cuánto usaste. Acá se ve cuánto aporta cada uno." />
-          </div>
-          <p className="text-xs text-muted leading-relaxed mb-4">
-            La tarifa tiene una parte fija, que se paga igual, y una variable
-            según lo que consumas.
-          </p>
-
-          <dl className="space-y-3 text-sm">
-            <Row
-              label="Tu categoría de tarifa"
-              value="Residencial sin subsidio"
-              tip="La categoría que la distribuidora aplica a tu domicilio. Define el precio del kWh y el cargo fijo que te corresponden."
-            />
-            <Row
-              label={`Precio de cada kWh (tramo ${data.cost.tier.minKwh}–${
-                data.cost.tier.maxKwh === 99999 ? '∞' : data.cost.tier.maxKwh
-              } kWh)`}
-              value={`$${formatNumber(data.cost.tier.valorTramo, 2)}`}
-              tip="El precio por kWh cambia según cuánto consumas en el mes: hay tramos, y a mayor consumo el precio del tramo sube. Este es el tramo en el que caés."
-            />
-            <Row
-              label="Cargo fijo del período"
-              value={formatCurrency(data.cost.fixedCharge)}
-              tip="Es un monto que se paga por tener el servicio conectado, consumas o no. Acá se muestra la parte proporcional a los días del período elegido."
-            />
-            <Row
-              label="Lo que consumiste"
-              value={formatCurrency(data.cost.variableCharge)}
-              tip="Es el precio del kWh multiplicado por los kWh que usaste. Esta es la parte de la factura sobre la que sí podés influir."
-            />
-            <div className="pt-3 border-t border-border-soft flex items-center justify-between font-semibold">
-              <span>Total de energía</span>
-              <span>{formatCurrency(data.cost.total)}</span>
-            </div>
-          </dl>
-
-          <p className="mt-4 text-xs text-muted leading-relaxed">
-            Calculado con {data.samples.toLocaleString('es-AR')} mediciones
-            tomadas entre el {formatDateTime(data.firstAt)} y el{' '}
-            {formatDateTime(data.lastAt)}.
-          </p>
-        </section>
-      )}
+      {data?.available && data.cost && <ElectricityBreakdown cost={data.cost} />}
+      {data?.available && !data.cost && <p className="text-sm text-warn mb-5">{data.costUnavailableReason??'No hay un cuadro documentado para el período elegido.'}</p>}
+      <TariffAndBillTools isArea={!!isArea} key={deviceId??'default'} onSaved={()=>void fetchConsumption()} />
 
       {data?.available && isArea && (
         <p className="text-xs text-muted leading-relaxed animate-fade-in">
@@ -255,15 +211,3 @@ const PERIOD_LABEL: Record<PeriodKey | 'billing', string> = {
   week: '7 días',
   month: '30 días',
 };
-
-function Row({ label, value, tip }: { label: string; value: string; tip: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 text-muted">
-      <span className="flex items-center gap-1.5">
-        {label}
-        <InfoTooltip text={tip} title={label} />
-      </span>
-      <span className="text-foreground font-medium text-right shrink-0">{value}</span>
-    </div>
-  );
-}

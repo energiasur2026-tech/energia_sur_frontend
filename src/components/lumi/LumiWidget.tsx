@@ -1,4 +1,7 @@
 'use client';
+import {useMeterId} from '@/lib/use-meter-id';
+import {CATEGORY_HELP_OPEN,type CategoryHelpRequest} from '@/lib/lumi-category-help';
+import {LumiCategoryHelp} from './LumiCategoryHelp';
 import { meterFetch } from '@/lib/meter-fetch';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -6,15 +9,21 @@ import { createPortal } from 'react-dom';
 import { usePolling } from '@/lib/use-polling';
 import { LumiAvatar } from './LumiAvatar';
 import { LumiHistory } from './LumiHistory';
+import { LumiEvents } from './LumiEvents';
+import {LumiResponseStyle} from './LumiResponseStyle';
+import { LumiMemory } from './LumiMemory';
+import { useLumiSounds } from './use-lumi-sounds';
+import { newEventSound } from './lumi-sound';
 import { useLumiReducedMotion } from './use-reduced-motion';
-import { LUMI_LABELS, isPriorityEvent, resolveLumiState, type LumiSession } from './lumi-state';
+import { LUMI_LABELS, isConsultation, isPendingEvent, isPriorityEvent, resolveLumiState, type LumiSession } from './lumi-state';
 import styles from './lumi.module.css';
 
-const EQUIPMENT = ['Pava eléctrica', 'Microondas', 'Plancha', 'Lavarropas', 'Calefactor', 'Bomba de agua', 'Otro equipo', 'No recuerdo'];
 type Tab = 'chat' | 'events' | 'preferences';
 const API = '/api/lumi/v1';
 
 export function LumiWidget({ userId }: { userId: string }) {
+  const deviceId=useMeterId();
+  const [categoryHelp,setCategoryHelp]=useState<CategoryHelpRequest|null>(null);
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [tab, setTab] = useState<Tab>('chat');
@@ -34,6 +43,8 @@ export function LumiWidget({ userId }: { userId: string }) {
   const request = useRef<AbortController | null>(null);
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reducedMotion = useLumiReducedMotion(session?.preferences?.reducedMotion ?? false);
+  const playSound = useLumiSounds(!!session && session.preferences?.soundsEnabled !== false);
+  const knownEvents = useRef<Set<string> | null>(null);
   const introKey = `energia-sur:lumi-intro:v1:${userId}`;
 
   // Only UI onboarding is stored locally. Conversation/preferences stay on the server.
@@ -86,8 +97,15 @@ export function LumiWidget({ userId }: { userId: string }) {
         throw new Error('La respuesta de Lumi no es compatible. Intentá nuevamente más tarde.');
       }
       if (!mounted.current || request.current !== controller) return false;
-      setSession(data);
+      setSession(current => action && (action.action === 'read' || action.action === 'label' || data.snapshot) && current ? { ...current, ...data } : data);
       setError('');
+      const cue = newEventSound(knownEvents.current, data.events, !!data.preferences?.proactivePaused);
+      knownEvents.current = new Set(data.events.map((event: { id: string }) => event.id));
+      if (data.preferences?.soundsEnabled !== false) {
+        if (action?.action === 'chat') playSound(data.answer?.intent === 'saving' || data.answer?.intent === 'appliance' ? 'suggestion' : 'reply');
+        else if (action && !(action.action === 'preferences' && action.preferences && 'soundsEnabled' in (action.preferences as object))) playSound('success');
+        else if (!action && cue) playSound(cue);
+      }
       if (action && action.action !== 'chat') {
         setSuccess(true);
         if (successTimer.current) clearTimeout(successTimer.current);
@@ -96,6 +114,7 @@ export function LumiWidget({ userId }: { userId: string }) {
       return true;
     } catch (failure) {
       if (!mounted.current || request.current !== controller) return false;
+      if (action) playSound('error');
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : 'No pude conectar con Lumi.');
       else setError('La solicitud se interrumpió. Podés volver a intentar.');
       return false;
@@ -107,15 +126,16 @@ export function LumiWidget({ userId }: { userId: string }) {
         if (mounted.current) setBusy(false);
       }
     }
-  }, []);
+  }, [playSound]);
 
   const refresh = useCallback(() => { void load(); }, [load]);
   usePolling(refresh, 120000);
 
   const closePanel = useCallback(() => {
+    playSound('close');
     if (reducedMotion) setOpen(false);
     else setClosing(true);
-  }, [reducedMotion]);
+  }, [reducedMotion, playSound]);
 
   useEffect(() => {
     if (!open) return;
@@ -159,16 +179,22 @@ export function LumiWidget({ userId }: { userId: string }) {
     };
   }, [open]);
 
+  useEffect(()=>{
+    const onHelp=(event:Event)=>{const detail=(event as CustomEvent<CategoryHelpRequest>).detail;if(!detail||detail.meterSelection!==deviceId||typeof detail.requestId!=='string'||!detail.context||['province','locality','provider'].some(k=>typeof detail.context[k as keyof typeof detail.context]!=='string'))return;setCategoryHelp(detail);setTab('chat');setClosing(false);setOpen(true);setIntro(false);setGreeting(false);};
+    window.addEventListener(CATEGORY_HELP_OPEN,onHelp);return()=>window.removeEventListener(CATEGORY_HELP_OPEN,onHelp);
+  },[deviceId]);
+
   const events = session?.events ?? [];
-  const unread = events.filter(event => !event.read);
-  const state = resolveLumiState({ events, busy, success, greeting });
-  const pending = unread.filter(event => event.question && !event.userLabels.length);
-  const sortedEvents = [...events].sort((a, b) => Number(isPriorityEvent(b)) - Number(isPriorityEvent(a)) || Number(a.read) - Number(b.read));
+  const unread = events.filter(isPendingEvent);
+  const attentionEvents = session?.preferences?.proactivePaused ? events.filter(event => !isConsultation(event)) : events;
+  const state = resolveLumiState({ events: attentionEvents, busy, success, greeting });
+  const pending = session?.preferences?.proactivePaused ? [] : unread.filter(isConsultation);
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
     const text = question.trim();
     if (!text || busy) return;
+    playSound('send');
     if (await load({ action: 'chat', question: text })) setQuestion('');
   }
 
@@ -178,11 +204,11 @@ export function LumiWidget({ userId }: { userId: string }) {
       <button ref={trigger} type="button" className={styles.trigger} aria-label="Abrir Lumi, tu asistente energético"
         aria-describedby="lumi-status"
         aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? 'lumi-panel' : undefined}
-        onClick={() => { setClosing(false); setOpen(true); setIntro(false); setGreeting(false); }}>
+        onClick={() => { setCategoryHelp(null); playSound(unread.some(isPriorityEvent) ? 'alert' : pending.length ? 'question' : unread.length ? 'suggestion' : 'open'); setClosing(false); setOpen(true); setIntro(false); setGreeting(false); }}>
         <span className={styles.suspended} data-reduced-motion={reducedMotion || undefined}>
           <LumiAvatar state={state} reducedMotion={reducedMotion} decorative />
         </span>
-        {unread.length > 0 && <span className={styles.counter} aria-label={`${unread.length} avisos pendientes`}>{unread.length > 99 ? '99+' : unread.length}</span>}
+        {unread.length > 0 && <span className={styles.counter} aria-label={`${unread.length} elementos pendientes`}>{unread.length > 99 ? '99+' : unread.length}</span>}
       </button>
       <span id="lumi-status" className="sr-only" role="status">{LUMI_LABELS[state]}{unread.length ? `. ${unread.length} avisos pendientes.` : ''}</span>
     </div>
@@ -190,6 +216,10 @@ export function LumiWidget({ userId }: { userId: string }) {
       <dialog ref={dialog} id="lumi-panel" className={styles.panel} aria-labelledby="lumi-title"
         data-closing={closing || undefined} data-reduced-motion={reducedMotion || undefined} inert={closing}
         onAnimationEnd={event => { if (event.target === event.currentTarget && closing) setOpen(false); }}
+        onClickCapture={event => {
+          const control = (event.target as HTMLElement).closest('button, input[type="checkbox"]');
+          if (control && !control.hasAttribute('disabled') && !control.hasAttribute('data-sound-control') && !control.closest('header') && control.getAttribute('type') !== 'submit') playSound('tap');
+        }}
         onCancel={event => { event.preventDefault(); closePanel(); }} onClick={event => { if (event.target === event.currentTarget) {
           const rect = event.currentTarget.getBoundingClientRect();
           if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closePanel();
@@ -198,19 +228,20 @@ export function LumiWidget({ userId }: { userId: string }) {
           <div><h2 id="lumi-title">Lumi <span>· EnergIA Sur</span></h2><p>{session?.meterName ?? 'Tu asistente energético'}</p></div>
           <button autoFocus type="button" onClick={closePanel} aria-label="Cerrar Lumi"><span aria-hidden="true">×</span></button>
         </header>
-        <div className={styles.hero}>
+        <div className={styles.hero} data-section={tab}>
           <LumiAvatar state={state} reducedMotion={reducedMotion} decorative />
-          <div><strong>{state === 'alert' ? 'Tenés avisos para revisar' : pending.length ? 'Tengo una consulta sobre tu consumo' : busy ? 'Procesando tu solicitud…' : success ? 'Listo, se guardó el cambio' : 'Entendamos tu energía'}</strong>
+          <div><strong>{categoryHelp&&tab==='chat'?'Te ayudo a identificar tu categoría':state === 'alert' ? 'Tenés avisos para revisar' : pending.length ? 'Tengo una consulta sobre tu consumo' : busy ? 'Procesando tu solicitud…' : success ? 'Listo, se guardó el cambio' : 'Entendamos tu energía'}</strong>
           <p>{state === 'alert' ? 'Revisá el detalle y la prioridad en Avisos.' : 'Consumo, consultas y recomendaciones en un solo lugar.'}</p></div>
         </div>
         <nav className={styles.tabs} aria-label="Secciones de Lumi">
-          <button type="button" aria-pressed={tab === 'chat'} onClick={() => setTab('chat')}>Chat</button>
+          <button type="button" aria-pressed={tab === 'chat'} onClick={() => {setTab('chat');setCategoryHelp(null);}}>Chat</button>
           <button type="button" aria-pressed={tab === 'events'} onClick={() => setTab('events')}>Avisos{unread.length ? ` (${unread.length})` : ''}</button>
           <button type="button" aria-pressed={tab === 'preferences'} onClick={() => setTab('preferences')}>Preferencias</button>
         </nav>
-        <div className={tab === 'chat' ? styles.chat : styles.content}>
+        <div className={tab === 'chat' && !categoryHelp ? styles.chat : tab === 'events' ? styles.eventsPane : styles.content}>
           {tab !== 'chat' && error && <div className={styles.error} role="status"><p>{error}</p><button type="button" disabled={busy} onClick={refresh}>Volver a intentar</button></div>}
-          {tab === 'chat' && <>
+          {tab === 'chat' && categoryHelp && <LumiCategoryHelp key={categoryHelp.requestId} request={categoryHelp} onBack={()=>{setCategoryHelp(null);closePanel();}}/>}
+          {tab === 'chat' && !categoryHelp && <>
             {session && <div className={styles.chatTools}><div className={styles.clear}>
               {confirmClear ? <><span>¿Borrar tu historial de este medidor?</span><button type="button" disabled={busy} onClick={async () => { if (await load({ action: 'clear' })) setConfirmClear(false); }}>Borrar historial</button><button type="button" onClick={() => setConfirmClear(false)}>Cancelar</button></> : <button type="button" onClick={() => setConfirmClear(true)}>Borrar conversación</button>}
             </div></div>}
@@ -225,21 +256,17 @@ export function LumiWidget({ userId }: { userId: string }) {
               </form>
             </footer>
           </>}
-          {tab === 'events' && <section aria-label="Preguntas y notificaciones">
-            {!events.length && <p className={styles.empty}>{session ? 'No hay avisos en el historial disponible.' : 'Los avisos aparecerán cuando Lumi esté disponible.'}</p>}
-            {sortedEvents.map(event => <article key={event.id} className={styles.event} data-priority={isPriorityEvent(event)}>
-              <strong>{isPriorityEvent(event) ? 'Aviso eléctrico · Revisar con prioridad' : event.question ? 'Consulta sobre tu consumo' : 'Aviso de consumo'}</strong>
-              <time dateTime={event.at}>{new Date(event.at).toLocaleString('es-AR')}</time>
-              <p>{event.evidence}</p>
-              {event.question && <><p>{event.question}</p><fieldset disabled={busy}><legend>Equipos que recordás utilizar (podés elegir varios)</legend>{EQUIPMENT.map(label => <label key={label}><input type="checkbox" checked={event.userLabels.includes(label)} onChange={e => void load({ action: 'label', eventId: event.id, labels: e.target.checked ? [...event.userLabels, label] : event.userLabels.filter(value => value !== label) })} />{label}</label>)}</fieldset></>}
-              {!event.read && <button disabled={busy} type="button" onClick={() => void load({ action: 'read', eventId: event.id })}>Marcar como leído</button>}
-            </article>)}
-          </section>}
+          {tab === 'events' && (session ? <LumiEvents events={events} busy={busy} onAction={load} /> : <p className={styles.empty}>Los avisos aparecerán cuando Lumi esté disponible.</p>)}
           {tab === 'preferences' && <section className={styles.preferences} aria-label="Preferencias de Lumi">
             <h3>A tu ritmo</h3><p>Estas preferencias se guardan en tu cuenta.</p>
             {session?.preferences ? <>
+              <LumiResponseStyle enabled={session.preferences.briefResponses===true} busy={busy} onSave={value=>load({action:'preferences',preferences:{briefResponses:value}})}/>
               <label><input type="checkbox" disabled={busy} checked={!!session.preferences.reducedMotion} onChange={event => void load({ action: 'preferences', preferences: { ...session.preferences, reducedMotion: event.target.checked } })} />Reducir movimientos de Lumi</label>
               <label><input type="checkbox" disabled={busy} checked={!!session.preferences.proactivePaused} onChange={event => void load({ action: 'preferences', preferences: { ...session.preferences, proactivePaused: event.target.checked } })} />Pausar consultas proactivas</label>
+              <label><input data-sound-control type="checkbox" disabled={busy} checked={session.preferences.soundsEnabled !== false} onChange={event => void load({ action: 'preferences', preferences: { soundsEnabled: event.target.checked } })} />Sonidos de Lumi</label>
+              <p>Tonos breves para preguntas, avisos, sugerencias y acciones. Se activan después de interactuar y se silencian si esta pestaña queda oculta.</p>
+              <button data-sound-control type="button" disabled={busy || session.preferences.soundsEnabled === false} onClick={() => playSound('question')}>Probar sonido</button>
+              <LumiMemory session={session} busy={busy} onAction={load} />
             </> : <p>Las preferencias estarán disponibles cuando el servicio responda.</p>}
           </section>}
         </div>

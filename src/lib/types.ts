@@ -75,6 +75,6 @@ export type ConsumptionPayload = {
   firstAt: string | null;
   lastAt: string | null;
 } & (
-  | { available: true; reason: null; consumedKwh: number; cost: EnergyCost }
+  | { available: true; reason: null; consumedKwh: number; cost: EnergyCost | null; costUnavailableReason?: string }
   | { available: false; reason: ConsumptionReason; consumedKwh: null; cost: null }
 );

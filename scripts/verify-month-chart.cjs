@@ -1,0 +1,15 @@
+const {test,afterEach}=require('node:test');const assert=require('node:assert/strict');const {JSDOM}=require('jsdom');const dom=new JSDOM('<html><body></body></html>');for(const k of ['window','document','HTMLElement','Node','MutationObserver','getComputedStyle'])globalThis[k]=k==='getComputedStyle'?dom.window[k].bind(dom.window):dom.window[k];globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const React=require('react'),{render,screen,cleanup}=require('@testing-library/react'),userEvent=require('@testing-library/user-event').default,fs=require('fs'),path=require('path'),ts=require('typescript');
+function load(file,dependency=require){const mod={exports:{}};new Function('require','exports','module',ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText)(dependency,mod.exports,mod);return mod.exports;}
+const {MonthChart}=load('components/MonthChart.tsx',name=>name==='@/lib/format'?load('lib/format.ts'):name==='@/lib/use-chart-colors'?{useChartColors:()=>({})}:name==='recharts'?new Proxy({},{get:(_,key)=>props=>key==='Line'?React.createElement('div',{'data-testid':props.name,'data-points':JSON.stringify(props.data)}):React.createElement('div',null,props.children)}):require(name));
+const fixture={month:'2026-11',monthStart:'2026-11-01T03:00:00Z',daysInMonth:30,todayX:10,measuredKwh:20,quality:{gaps:1},tariff:{valid:true,includeFixed:false,category:'Fixture',note:'Ejemplo de prueba'},goal:{goalKwh:50,projectedMonthKwh:40,projectedCostArs:4000},chart:{references:[{x:1,pace:0,target:50}],observed:[{x:3,real:20},{x:4,real:null}],estimated:[{x:31,projected:40}],cost:{references:[{x:1,pace:0,target:5000}],observed:[{x:3,real:2000},{x:4,real:null}],estimated:[{x:31,projected:4000}]}}};
+afterEach(cleanup);
+test('unit selector changes every series and labels while retaining reference visibility and null gaps',async()=>{
+ render(React.createElement(MonthChart,{projection:fixture}));const user=userEvent.setup();await user.click(screen.getByRole('button',{name:'Ocultar ritmo de referencia'}));
+ await user.click(screen.getByRole('button',{name:'$ ARS'}));assert.equal(screen.getByRole('button',{name:'$ ARS'}).getAttribute('aria-pressed'),'true');assert.match(screen.getByRole('img').getAttribute('aria-label'),/Costo estimado/);
+ assert.deepEqual(JSON.parse(screen.getByTestId('real').dataset.points),fixture.chart.cost.observed);assert.equal(screen.queryByTestId('pace'),null);assert.ok(screen.getByText(/No son una factura total/));
+ await user.click(screen.getByRole('button',{name:'kWh'}));assert.deepEqual(JSON.parse(screen.getByTestId('real').dataset.points),fixture.chart.observed);assert.equal(screen.queryByTestId('pace'),null);
+});
+test('money is unavailable for missing or invalid tariff conversion',()=>{
+ render(React.createElement(MonthChart,{projection:{...fixture,chart:{...fixture.chart,cost:null}}}));assert.equal(screen.getByRole('button',{name:'$ ARS'}).disabled,true);
+});

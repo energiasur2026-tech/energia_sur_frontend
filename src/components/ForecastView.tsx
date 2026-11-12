@@ -1,4 +1,5 @@
 'use client';
+import {ConfigureTariffLink} from './ConfigureTariffLink';
 import { useCallback,useRef,useState } from 'react';
 import { isMonthlyProjection,PROJECTION_CONTRACT_ERROR } from '@/lib/projection-contract';
 import { meterFetch } from '@/lib/meter-fetch';
@@ -17,6 +18,7 @@ export function ForecastView({preview}:{preview?:MonthlyProjection}={}){
  {error&&<p role="alert" className="rounded-xl border border-danger/40 p-4 text-sm text-danger mb-5">{error}</p>}
  {!data&&<p className="text-sm text-muted py-12">{error?'No se pudo cargar este período.':'Consultando las mediciones del mes…'}</p>}
  {data&&g&&<><p className="text-xs text-muted mb-4">{data.meterName} · Mes calendario · hora de Argentina</p>
+ <p className="text-xs text-warn mb-2">{data.tariff.note}</p>{!data.tariff.valid&&<ConfigureTariffLink/>}
  <GoalSetter key={JSON.stringify(data.choice)} preview={!!preview} role={data.role??'central'} goal={g} choice={data.choice} tariff={data.tariff} onSaved={refresh}/>
  <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-6 mb-6"><div className="flex flex-wrap gap-2 items-center justify-between mb-5"><h2 className="font-semibold text-sm">Cómo podría terminar {data.month}</h2><span className="text-xs rounded-full bg-accent-soft px-3 py-1 text-accent">Estimación por ritmo observado</span></div>
  <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-6">

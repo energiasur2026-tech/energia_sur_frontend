@@ -19,6 +19,6 @@ assert.equal(resolve({ events: [event] }), 'alert');
 assert.equal(resolve({ busy: true, events: [{ ...event, question: 'Test question' }] }), 'analyzing');
 assert.equal(resolve({ busy: true, success: true, events: [{ ...event, type: 'voltage' }] }), 'alert', 'Electrical warnings outrank loading and success');
 assert.equal(resolve({ events: [{ ...event, severity: 'CRITICAL' }, { ...event, question: 'Test question' }] }), 'alert');
-assert.equal(resolve({ events: [{ ...event, read: true, question: 'Test question' }] }), 'idle', 'Read events must not keep drawing attention');
-assert.equal(resolve({ events: [{ ...event, question: 'Test question', userLabels: ['Plancha'] }] }), 'alert', 'Answered questions are no longer question state');
+assert.equal(resolve({ events: [{ ...event, read: true, question: 'Test question' }] }), 'question', 'A read but unanswered consultation remains pending');
+assert.equal(resolve({ events: [{ ...event, question: 'Test question', userLabels: ['Plancha'] }] }), 'idle', 'Answered questions are no longer pending');
 console.log('11 Lumi state checks passed. Fixtures are never imported by production.');

@@ -4,3 +4,7 @@ const box={exports:{}};vm.runInNewContext(code,box);const valid=JSON.parse(fs.re
 assert.equal(box.exports.isMonthlyProjection(valid),true);
 for(const payload of [null,[],{}, {goal:valid.goal}, {...valid,tariff:undefined},{...valid,quality:null},{...valid,chart:null},{...valid,warnings:null}])assert.equal(box.exports.isMonthlyProjection(payload),false);
 console.log('9 projection contract checks passed; legacy responses never reach rendering.');
+
+assert.equal(box.exports.isMonthlyProjection({...valid,chart:{...valid.chart,cost:{references:[],observed:[{x:1,real:-1}],estimated:[]}}}),false);
+assert.equal(box.exports.isMonthlyProjection({...valid,chart:{...valid.chart,cost:{references:[],observed:[{x:1,real:null}],estimated:[]}}}),true);
+console.log('2 monetary series validation checks passed.');

@@ -241,7 +241,7 @@ function MeterCard({ meter, onUnlink }: { meter: MeterSummary; onUnlink: () => v
               ) : (
                 <MapPin className="h-3 w-3" />
               )}
-              {meter.role === 'central' ? ROLE_LABEL.central : meter.areaLabel || ROLE_LABEL.area}
+              {meter.role === 'central' ? 'Mide todo el consumo del lugar' : meter.areaLabel || ROLE_LABEL.area}
             </span>
             {meter.phases === 3 && (
               <span className="inline-flex items-center rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">

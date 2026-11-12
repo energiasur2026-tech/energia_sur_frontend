@@ -1,3 +1,4 @@
+import {SelectedMeterName} from '@/components/SelectedMeterName';
 import { Suspense } from 'react';
 import { MeterContextBoundary } from '@/components/MeterContextBoundary';
 import { redirect } from 'next/navigation';
@@ -35,6 +36,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><div className="flex-1 flex flex-col pb-nav">
       <AppNav userEmail={user.email} />
       <MeterGoneBanner />
+      <SelectedMeterName/>
       <div className="flex flex-1 flex-col pb-40">
         <PageTransition>{children}</PageTransition>
       </div>
