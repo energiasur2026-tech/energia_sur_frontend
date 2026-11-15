@@ -37,6 +37,21 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const copy = COPY[mode];
   const Icon = copy.icon;
 
+  async function enterDashboard() {
+    // Browser authentication alone doesn't prove the server can validate its cookie.
+    // Keep the form mounted if that boundary fails, rather than redirecting in a loop.
+    let response: Response;
+    try {
+      response = await fetch('/auth/session', { cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(15000) });
+    } catch {
+      throw new Error('SESSION_SERVICE_UNAVAILABLE');
+    }
+    if (!response.ok) throw new Error(response.status === 401 ? 'SESSION_NOT_PERSISTED' : 'SESSION_SERVICE_UNAVAILABLE');
+    const session = await response.json();
+    if (session.authenticated !== true) throw new Error('SESSION_NOT_PERSISTED');
+    router.replace('/dashboard');
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -52,8 +67,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           password,
         });
         if (signInError) throw signInError;
-        router.push('/dashboard');
-        router.refresh();
+        await enterDashboard();
         return;
       }
 
@@ -67,8 +81,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
 
-      router.push('/dashboard');
-      router.refresh();
+      await enterDashboard();
     } catch (err) {
       setError(mapAuthError(err));
     } finally {
@@ -91,7 +104,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
         <form onSubmit={onSubmit} className="rounded-2xl border border-border-soft bg-surface p-6 space-y-4">
           {error && (
-            <p className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+            <p role="alert" className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
               {error}
             </p>
           )}
@@ -165,6 +178,8 @@ function mapAuthError(err: unknown): string {
   if (message.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.';
   if (message.includes('User already registered')) return 'Ya existe una cuenta con ese email.';
   if (message.includes('Password should be at least')) return 'La contraseña debe tener al menos 6 caracteres.';
+  if (message === 'SESSION_SERVICE_UNAVAILABLE') return 'La cuenta se autenticó, pero el servidor local no pudo validar la sesión con Supabase. Revisá su conexión y reintentá. Conservé los datos del formulario.';
+  if (message === 'SESSION_NOT_PERSISTED') return 'La sesión no llegó correctamente al servidor. Permití las cookies de este sitio y reintentá.';
 
   return 'No se pudo completar la operación. Intentá de nuevo.';
 }

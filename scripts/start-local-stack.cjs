@@ -7,6 +7,7 @@ const front = path.resolve(__dirname, '..');
 const root = path.dirname(front);
 const back = path.join(root, 'energIA_sur_backend');
 const ml = path.join(root, 'energIA_sur_machine_learning');
+const development = process.argv.includes('--dev');
 
 function nodeRuntime() {
   if (Number(process.versions.node.split('.')[0]) >= 22) return process.execPath;
@@ -49,11 +50,11 @@ async function main() {
   const python = pythonRuntime();
   const envPath = path.join(back, '.env.local');
   if (!fs.existsSync(envPath)) throw new Error('Falta energIA_sur_backend/.env.local');
-  require('@next/env').loadEnvConfig(back);
+  require('@next/env').loadEnvConfig(back, development);
   for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'LUMI_SERVICE_SECRET']) {
     if (!process.env[key]) throw new Error('Falta configurar ' + key + ' en el backend.');
   }
-  for (const directory of [front, back]) {
+  for (const directory of development ? [] : [front, back]) {
     if (!fs.existsSync(path.join(directory, '.next', 'BUILD_ID'))) throw new Error('Falta compilar ' + path.basename(directory) + ' con npm run build.');
   }
   await Promise.all([3000, 3001, 8010].map(assertFree));
@@ -76,10 +77,10 @@ async function main() {
   start('Lumi', python, ['-m', 'lumi.server'], ml, {
     LUMI_DB_PATH: path.join(ml, 'data', 'lumi-local.sqlite3'), LUMI_PORT: '8010', LUMI_HOST: '127.0.0.1',
   });
-  start('Backend', node, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3001'], back, {
+  start('Backend', node, ['node_modules/next/dist/bin/next', development ? 'dev' : 'start', '--hostname', '127.0.0.1', '--port', '3001'], back, {
     LUMI_SERVICE_URL: 'http://127.0.0.1:8010', LUMI_ALLOWED_ORIGINS: 'http://127.0.0.1:3000,http://localhost:3000',
   });
-  start('Frontend', node, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3000'], front, {
+  start('Frontend', node, ['node_modules/next/dist/bin/next', development ? 'dev' : 'start', '--hostname', '127.0.0.1', '--port', '3000'], front, {
     BACKEND_URL: 'http://127.0.0.1:3001',
   });
   console.log('EnergIA Sur: http://127.0.0.1:3000 — mantené esta terminal abierta. Ctrl+C detiene los tres servicios.');

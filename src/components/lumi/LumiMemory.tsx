@@ -25,6 +25,7 @@ function MemoryCard({ habit, busy, onAction }: { habit: LumiMemoryItem } & Pick<
   return <article className={styles.memoryCard}>
     <strong>{habit.equipment}</strong>
     <p>{habit.kind === 'routine' ? 'Hábito habitual' : habit.kind === 'plan' ? 'Plan futuro' : 'Evento puntual'} · Declarado por vos · Sin confirmar con mediciones</p>
+    {habit.patternId && <p>Asociación con una franja observada, confirmada por vos. No identifica cada uso del equipo.</p>}
     <p>{habit.localTime ? 'Horario: ' + habit.localTime : 'Horario no indicado'} · {habit.timezone}</p>
     {habit.weekdays?.length ? <p>Días: {habit.weekdays.map(day => days[day]).join(', ')}</p> : <p>Días no indicados</p>}
     {(habit.durationMinutes || habit.powerW) && <p>{habit.durationMinutes ? habit.durationMinutes.toLocaleString('es-AR') + ' min' : 'Duración desconocida'} · {habit.powerW ? habit.powerW.toLocaleString('es-AR') + ' W declarados' : 'Potencia desconocida'}</p>}
@@ -46,13 +47,21 @@ function MemoryCard({ habit, busy, onAction }: { habit: LumiMemoryItem } & Pick<
 }
 function SupplyProfile({session}:Props){return <details className={styles.memoryCard}><summary>Referencia de tu suministro</summary><p>La ubicación, el proveedor y la tarifa se administran desde Ajustes para este medidor. No se copian del domicilio personal.</p><p>{session.supplyProfile?.province??'Provincia sin configurar'} · {session.supplyProfile?.distributor??'Proveedor sin confirmar'}</p><ConfigureTariffLink/></details>;}
 export function LumiMemory({ session, busy, onAction }: Props) {
+  const [confirmPatterns, setConfirmPatterns] = useState(false);
   return <section className={styles.memorySection} aria-label="Lo que Lumi recuerda">
     <h3><Brain size={18} aria-hidden="true" /> Lo que Lumi recuerda</h3>
     <p>Los recuerdos pertenecen a tu cuenta y a este medidor. Guardar una declaración no confirma un patrón ni entrena un modelo.</p>
     <label><input type="checkbox" checked={session.preferences?.memoryEnabled !== false} disabled={busy} onChange={event => void onAction({ action: 'preferences', preferences: { memoryEnabled: event.target.checked } })} />Permitir guardar y usar hábitos energéticos</label>
-    <p>Pausar conserva los recuerdos para administrarlos; no se usan hasta que vuelvas a habilitarlos.</p>
+    <p>Pausar conserva los recuerdos para administrarlos; no se usan hasta que vuelvas a habilitarlos y no se guardan nuevas actualizaciones de patrones.</p>
     {!session.memories?.length && <p>Todavía no hay recuerdos. Podés contarme, por ejemplo, cuándo usás la pava.</p>}
     {session.memories?.map(habit => <MemoryCard key={habit.id} habit={habit} busy={busy} onAction={onAction} />)}
+    <details className={styles.memoryCard}><summary>Patrones estadísticos observados</summary>
+      <p>Se actualizan con hasta 28 días recientes. No reconocen aparatos. Borrar la conversación elimina los mensajes y el contexto; conserva hábitos y patrones.</p>
+      {session.routines?.patterns?.map(pattern => <p key={pattern.id}>{pattern.hour}:00 a {pattern.hour + 1}:00 · {pattern.group === 'weekday' ? 'Días de semana' : 'Fines de semana'} · {pattern.supportDays} de {pattern.eligibleDays} días con evidencia · {pattern.timezone}</p>)}
+      {!session.routines?.patterns?.length && <p>Todavía no hay patrones con evidencia suficiente.</p>}
+      <p>Borrar patrones elimina el perfil aprendido y sus asociaciones con aparatos para tu cuenta y este medidor. Conserva las lecturas originales y los hábitos declarados por separado; un análisis posterior puede volver a aprender del historial.</p>
+      {confirmPatterns ? <div><button disabled={busy} type="button" onClick={async () => { if (await onAction({ action: 'memory', operation: 'clearPatterns' })) setConfirmPatterns(false); }}>Confirmar borrado de patrones y asociaciones</button><button type="button" disabled={busy} onClick={() => setConfirmPatterns(false)}>Cancelar</button></div> : <button type="button" disabled={busy} onClick={() => setConfirmPatterns(true)}>Borrar patrones y asociaciones</button>}
+    </details>
     <SupplyProfile session={session} busy={busy} onAction={onAction} />
     <details className={styles.memoryCard}><summary>Consejo de uso eficiente de la pava</summary><p>Calentar solo el agua necesaria, respetando el mínimo del fabricante, y evitar recalentamientos. No se cuantificó ahorro.</p>
       <label><input type="checkbox" disabled={busy} checked={session.recommendations?.some(item => item.kind === 'kettle-water' && item.adopted) ?? false} onChange={event => void onAction({ action: 'recommendation', kind: 'kettle-water', adopted: event.target.checked })} />Adopté este consejo</label>

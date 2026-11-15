@@ -46,3 +46,13 @@ test('memory pause and optional provider preferences use booleans without client
 test('supply has one editing source in Settings and sends no duplicate preference action',async()=>{
  const user=setup();await user.click(screen.getByText('Referencia de tu suministro'));assert.equal(screen.getByRole('link',{name:'Configurar tarifa'}).getAttribute('href'),'/ajustes#proveedor-tarifa');assert.equal(screen.queryByRole('button',{name:'Guardar referencia'}),null);assert.equal(calls.length,0);
 });
+
+test('pattern deletion requires confirmation and sends no client identity', async () => {
+  const user=setup();
+  await user.click(screen.getByText('Patrones estadísticos observados'));
+  await user.click(screen.getByRole('button',{name:'Borrar patrones y asociaciones'}));
+  assert.equal(calls.length,0);
+  await user.click(screen.getByRole('button',{name:'Confirmar borrado de patrones y asociaciones'}));
+  assert.deepEqual(calls,[{action:'memory',operation:'clearPatterns'}]);
+  assert.ok(screen.getByText(/un análisis posterior puede volver a aprender/));
+});

@@ -64,7 +64,7 @@
 .newMessages { align-self: center; min-height: 44px; margin: 4px 16px 8px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--accent-soft); color: var(--foreground); font-size: 12px; flex-shrink: 0; }
 .empty { color: var(--muted); font-size: 14px; line-height: 1.7; padding: 20px 4px; }
 .message { white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 15px; background: var(--surface-raised); padding: 12px 14px; font-size: 14px; line-height: 1.65; max-width: 94%; }
-.message strong { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.message .messageSender { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
 .message[data-role='user'] { align-self: flex-end; background: var(--accent-soft); }
 .note { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 0 0 8px; }
 .composer { display: flex; gap: 8px; }
@@ -160,3 +160,5 @@
 .memorySection input[type=checkbox] { accent-color: var(--accent); flex-shrink: 0; }
 .memorySection label { align-items: start; }
 .memorySection :is(button,summary,input,textarea,select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.message .amount { font-weight: 700; color: inherit; font-size: inherit; display: inline; }

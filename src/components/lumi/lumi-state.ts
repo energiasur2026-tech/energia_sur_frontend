@@ -11,10 +11,12 @@ export type LumiEvent = {
   read: boolean; userLabels: string[]; answered?: boolean; answeredAt?: string | null; otherEquipment?: string; severity?: 'INFO' | 'WARNING' | 'CRITICAL';
 };
 export type LumiMemoryItem = {
+  patternId?: string;
   id: string; equipment: string; kind: 'routine' | 'plan' | 'exception'; localTime?: string | null; weekdays?: number[];
   durationMinutes?: number; powerW?: number; timezone: string; updatedAt: string; occurrenceDate?: string; active?: boolean;
 };
 export type LumiSession = {
+  routines?: { status: string; updatedAt: string; patterns: { id: string; hour: number; group: string; supportDays: number; eligibleDays: number; timezone: string }[] } | null;
   memories?: LumiMemoryItem[];
   supplyProfile?: { country?: string; province?: string; distributor?: string };
   recommendations?: { kind: string; adopted: boolean; adoptedAt: string }[];

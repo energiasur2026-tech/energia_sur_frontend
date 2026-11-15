@@ -58,3 +58,12 @@ test('Full avatar mounts all six image assets with a single active pose', () => 
     assert.equal((html.match(/height="520"/g) || []).length, 6);
   }
 });
+
+test('money is bold inline and arbitrary HTML remains escaped', () => {
+  const React=require('react');const {renderToStaticMarkup}=require('react-dom/server');
+  const {LumiMessageText}=load('LumiMessageText.tsx',name=>name==='./lumi.module.css'?{__esModule:true,default:{amount:'amount'}}:require(name));
+  const html=renderToStaticMarkup(React.createElement(LumiMessageText,{text:'Energía $ 418,95; total $ 1.825,50. <img src=x onerror=alert(1)>'}));
+  assert.ok(html.includes('<strong class="amount">$ 418,95</strong>'));
+  assert.ok(html.includes('<strong class="amount">$ 1.825,50</strong>'));
+  assert.ok(!html.includes('<img'));assert.ok(html.includes('&lt;img'));
+});

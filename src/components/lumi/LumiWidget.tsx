@@ -35,6 +35,8 @@ export function LumiWidget({ userId }: { userId: string }) {
   const [error, setError] = useState('');
   const [question, setQuestion] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
+  const [freshChat, setFreshChat] = useState(true);
+  const chatEpoch = useRef(0);
   const trigger = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const inFlight = useRef(false);
@@ -132,6 +134,10 @@ export function LumiWidget({ userId }: { userId: string }) {
   usePolling(refresh, 120000);
 
   const closePanel = useCallback(() => {
+    chatEpoch.current += 1;
+    setFreshChat(true);
+    setQuestion('');
+    setConfirmClear(false);
     playSound('close');
     if (reducedMotion) setOpen(false);
     else setClosing(true);
@@ -194,6 +200,12 @@ export function LumiWidget({ userId }: { userId: string }) {
     event.preventDefault();
     const text = question.trim();
     if (!text || busy) return;
+    const epoch = chatEpoch.current;
+    if (freshChat) {
+      // Clear server-side dialogue context as well: hiding messages alone would reuse old references.
+      if (!await load({ action: 'clear' }) || chatEpoch.current !== epoch) return;
+      setFreshChat(false);
+    }
     playSound('send');
     if (await load({ action: 'chat', question: text })) setQuestion('');
   }
@@ -242,10 +254,11 @@ export function LumiWidget({ userId }: { userId: string }) {
           {tab !== 'chat' && error && <div className={styles.error} role="status"><p>{error}</p><button type="button" disabled={busy} onClick={refresh}>Volver a intentar</button></div>}
           {tab === 'chat' && categoryHelp && <LumiCategoryHelp key={categoryHelp.requestId} request={categoryHelp} onBack={()=>{setCategoryHelp(null);closePanel();}}/>}
           {tab === 'chat' && !categoryHelp && <>
-            {session && <div className={styles.chatTools}><div className={styles.clear}>
-              {confirmClear ? <><span>¿Borrar tu historial de este medidor?</span><button type="button" disabled={busy} onClick={async () => { if (await load({ action: 'clear' })) setConfirmClear(false); }}>Borrar historial</button><button type="button" onClick={() => setConfirmClear(false)}>Cancelar</button></> : <button type="button" onClick={() => setConfirmClear(true)}>Borrar conversación</button>}
+            {freshChat && !!session?.messages.length && <div className={styles.chatTools}><div className={styles.clear}><button type="button" disabled={busy} onClick={() => setFreshChat(false)}>Continuar chat anterior</button></div><p className={styles.note}>Si enviás una consulta nueva, se borra la conversación anterior. Tus hábitos y patrones se conservan.</p></div>}
+            {session && !freshChat && <div className={styles.chatTools}><div className={styles.clear}>
+              {confirmClear ? <><span>¿Borrar tu historial de este medidor?</span><button type="button" disabled={busy} onClick={async () => { if (await load({ action: 'clear' })) { setConfirmClear(false); setFreshChat(true); } }}>Borrar historial</button><button type="button" onClick={() => setConfirmClear(false)}>Cancelar</button></> : <button type="button" onClick={() => setConfirmClear(true)}>Borrar conversación</button>}
             </div></div>}
-            <LumiHistory messages={session?.messages ?? []} loaded={session !== null} busy={busy}
+            <LumiHistory messages={freshChat ? [] : session?.messages ?? []} loaded={session !== null} busy={busy}
               reducedMotion={reducedMotion} error={error} onRetry={refresh} />
             <footer className={styles.chatFooter}>
               <p className={styles.note} role="status">{busy ? 'Procesando tu solicitud…' : success ? 'Cambio guardado.' : session?.dataStatus === 'no_measurements' ? 'Este medidor todavía no tiene mediciones almacenadas.' : session?.dataStatus === 'insufficient_history' ? 'Hay lecturas disponibles, pero falta historial para algunos análisis.' : 'Las respuestas dependen de las lecturas disponibles.'}</p>

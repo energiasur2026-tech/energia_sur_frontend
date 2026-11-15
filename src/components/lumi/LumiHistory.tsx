@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isNearHistoryEnd, messageKeys, type LumiMessage } from './lumi-conversation';
 import styles from './lumi.module.css';
+import {LumiMessageText} from './LumiMessageText';
 
 export function LumiHistory({ messages, loaded, busy, reducedMotion, error, onRetry }: {
   messages: LumiMessage[]; loaded: boolean; busy: boolean; reducedMotion: boolean;
@@ -83,7 +84,7 @@ export function LumiHistory({ messages, loaded, busy, reducedMotion, error, onRe
       {error && <div className={styles.error} role="status"><p>{error}</p><button type="button" disabled={busy} onClick={onRetry}>Volver a intentar</button></div>}
       {!messages.length && !error && <p className={styles.empty}>{loaded ? '¿Qué querés conocer sobre tu consumo?' : 'Cargando tu conversación y las mediciones de este medidor…'}</p>}
       {messages.map((message, index) => <p className={styles.message} data-role={message.role}
-        data-message-key={keys[index]} key={keys[index]}><strong>{message.role === 'user' ? 'Vos' : 'Lumi'}</strong>{message.text}</p>)}
+        data-message-key={keys[index]} key={keys[index]}><strong className={styles.messageSender}>{message.role === 'user' ? 'Vos' : 'Lumi'}</strong><LumiMessageText text={message.text}/></p>)}
     </div>
     {hasNew && <button className={styles.newMessages} type="button" onClick={() => {
       nearEnd.current = true;

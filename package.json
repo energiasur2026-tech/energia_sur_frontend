@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:lumi": "node --test scripts/verify-lumi-events.cjs scripts/verify-lumi-memory.cjs scripts/verify-lumi-sounds.cjs",
+    "test:lumi": "node --test scripts/verify-lumi-events.cjs scripts/verify-lumi-memory.cjs scripts/verify-lumi-sounds.cjs scripts/verify-lumi-chat-reset.cjs",
     "local:stack": "node scripts/start-local-stack.cjs",
+    "local:stack:dev": "node scripts/start-local-stack.cjs --dev",
     "test:month-chart": "node scripts/verify-month-chart.cjs",
     "test:billing": "node scripts/verify-electricity-billing.cjs"
   },
