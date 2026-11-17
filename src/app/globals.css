@@ -250,3 +250,5 @@ input[type="date"] {
 input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
+
+@media (min-width: 768px) { .app-shell[data-navigation="side"] > .app-shell-content, .app-shell[data-navigation="side"] .app-shell-content { margin-left: 14rem; min-width: 0; } }

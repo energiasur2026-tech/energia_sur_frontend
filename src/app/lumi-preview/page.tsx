@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { LumiAvatar } from '@/components/lumi/LumiAvatar';
+import { LumiWidget } from '@/components/lumi/LumiWidget';
 import { LUMI_LABELS, LUMI_STATES } from '@/components/lumi/lumi-state';
 
 export const metadata = { title: 'Lumi · Vista previa de diseño', robots: { index: false, follow: false } };
@@ -22,5 +23,6 @@ export default function LumiPreview() {
       <div className="mt-5 flex flex-wrap gap-6">{LUMI_STATES.map(state => <div key={state} className="text-center"><LumiAvatar state={state} compact /><p className="mt-2 text-xs text-muted">{state}</p></div>)}</div>
       <p className="mt-5 text-xs text-muted">72 px · Los indicadores se renderizan desde la interfaz. Movimiento reducido según la preferencia del sistema.</p>
     </section>
+    <LumiWidget userId="preview-user" />
   </main>;
 }

@@ -15,6 +15,7 @@ export function ForecastView({preview}:{preview?:MonthlyProjection}={}){
  usePolling(refresh,300000);
  const g=data?.goal;
  return <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto"><header className="flex flex-wrap items-end justify-between gap-4 mb-6"><div><h1 className="text-xl md:text-2xl font-bold tracking-tight">Proyección</h1><p className="text-sm text-muted mt-1">Tu consumo, tu objetivo y una estimación del cierre del mes.</p></div><label className="text-xs text-muted">Mes analizado<input type="month" disabled={!!preview} aria-label="Mes analizado" value={month||data?.month||''} onChange={e=>{++sequence.current;setData(null);setMonth(e.target.value);}} className="block mt-1 rounded-xl border border-border-soft bg-surface p-2 text-foreground"/></label></header>
+ {!preview&&<div className="mb-4"><button type="button" onClick={()=>void refresh()} className="text-sm text-accent underline py-2">Actualizar mediciones</button></div>}
  {error&&<p role="alert" className="rounded-xl border border-danger/40 p-4 text-sm text-danger mb-5">{error}</p>}
  {!data&&<p className="text-sm text-muted py-12">{error?'No se pudo cargar este período.':'Consultando las mediciones del mes…'}</p>}
  {data&&g&&<><p className="text-xs text-muted mb-4">{data.meterName} · Mes calendario · hora de Argentina</p>

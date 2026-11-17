@@ -1,5 +1,6 @@
 'use client';
 
+import { NavigationSettings } from './NavigationPreferences';
 import {MeterNameForm} from './MeterNameForm';
 import {SupplySettings} from './SupplySettings';
 import { useCallback, useState } from 'react';
@@ -362,6 +363,7 @@ export function SettingsView() {
 
       {settings&&<MeterNameForm key={settings.deviceId+settings.name} name={settings.name} isOwner={settings.isOwner===true} onSaved={()=>void fetchSettings()}/>}
       <SupplySettings key={deviceId??'default'}/>
+      <NavigationSettings />
       <ProfileForm />
 
       <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">

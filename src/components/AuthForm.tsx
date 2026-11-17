@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, LogIn, UserPlus, Zap } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
@@ -26,7 +25,6 @@ const COPY: Record<Mode, { title: string; cta: string; icon: typeof LogIn; switc
 };
 
 export function AuthForm({ mode }: { mode: Mode }) {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -49,7 +47,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
     if (!response.ok) throw new Error(response.status === 401 ? 'SESSION_NOT_PERSISTED' : 'SESSION_SERVICE_UNAVAILABLE');
     const session = await response.json();
     if (session.authenticated !== true) throw new Error('SESSION_NOT_PERSISTED');
-    router.replace('/dashboard');
+    // Authentication changes server cookies. Request a fresh document so a
+    // cached anonymous dashboard redirect cannot send us back to the login.
+    window.location.replace('/dashboard');
   }
 
   async function onSubmit(event: React.FormEvent) {

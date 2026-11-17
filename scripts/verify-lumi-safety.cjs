@@ -1,0 +1,11 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const ts=require('typescript');const fs=require('node:fs');
+const mod={exports:{}};
+new Function('exports','module',ts.transpileModule(fs.readFileSync('src/components/lumi/safety-policy.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(mod.exports,mod);
+const {nextSafety,readSafety,safetyKey,SAFETY_CONFIG}=mod.exports;
+const start=1_800_000_000_000;const fresh=()=>readSafety(null);
+test('90 active seconds and 72 hours, including dismissals',()=>{assert.equal(nextSafety(fresh(),start,89999,false),null);const first=nextSafety(fresh(),start,90000,false);assert.ok(first);assert.equal(nextSafety(first.state,start+SAFETY_CONFIG.intervalMs-1,90000,false),null);assert.ok(nextSafety(first.state,start+SAFETY_CONFIG.intervalMs,90000,false));});
+test('one per session survives cooldown and preferences disable automatic offers',()=>{assert.equal(nextSafety(fresh(),start,90000,true),null);assert.equal(nextSafety({...fresh(),enabled:false},start,90000,false),null);});
+test('rotation completes all three before repeating and survives serialization',()=>{let state=fresh();const ids=[];for(let i=0;i<4;i++){const next=nextSafety(readSafety(JSON.stringify(state)),start+i*SAFETY_CONFIG.intervalMs,90000,false);ids.push(next.tip.id);state=next.state;}assert.equal(new Set(ids.slice(0,3)).size,3);assert.equal(ids[0],ids[3]);});
+test('users are isolated; malformed storage recovers',()=>{assert.notEqual(safetyKey('a'),safetyKey('b'));assert.deepEqual(readSafety('{bad'),fresh());assert.deepEqual(readSafety('{"shown":["unknown"],"lastAt":"bad"}'),fresh());});

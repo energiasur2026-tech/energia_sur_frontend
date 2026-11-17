@@ -11,7 +11,9 @@
     "local:stack": "node scripts/start-local-stack.cjs",
     "local:stack:dev": "node scripts/start-local-stack.cjs --dev",
     "test:month-chart": "node scripts/verify-month-chart.cjs",
-    "test:billing": "node scripts/verify-electricity-billing.cjs"
+    "test:billing": "node scripts/verify-electricity-billing.cjs",
+    "test:lumi-safety": "node --test --test-force-exit scripts/verify-lumi-safety.cjs scripts/verify-lumi-safety-ui.cjs",
+    "test:settings": "node --test --test-force-exit scripts/verify-settings-personalization.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

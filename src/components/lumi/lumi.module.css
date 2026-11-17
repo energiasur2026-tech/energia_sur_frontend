@@ -162,3 +162,6 @@
 .memorySection :is(button,summary,input,textarea,select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .message .amount { font-weight: 700; color: inherit; font-size: inherit; display: inline; }
+
+.launcher[data-safety-hidden] { visibility: hidden; pointer-events: none; }
+.panel[hidden] { display: none !important; }

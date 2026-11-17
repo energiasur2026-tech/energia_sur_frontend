@@ -1,4 +1,5 @@
 'use client';
+import { LumiSafety, OPEN_SAFETY } from './LumiSafety';
 import {useMeterId} from '@/lib/use-meter-id';
 import {CATEGORY_HELP_OPEN,type CategoryHelpRequest} from '@/lib/lumi-category-help';
 import {LumiCategoryHelp} from './LumiCategoryHelp';
@@ -25,6 +26,7 @@ export function LumiWidget({ userId }: { userId: string }) {
   const deviceId=useMeterId();
   const [categoryHelp,setCategoryHelp]=useState<CategoryHelpRequest|null>(null);
   const [open, setOpen] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [tab, setTab] = useState<Tab>('chat');
   const [session, setSession] = useState<LumiSession | null>(null);
@@ -48,6 +50,12 @@ export function LumiWidget({ userId }: { userId: string }) {
   const playSound = useLumiSounds(!!session && session.preferences?.soundsEnabled !== false);
   const knownEvents = useRef<Set<string> | null>(null);
   const introKey = `energia-sur:lumi-intro:v1:${userId}`;
+
+  const onSafetyOpenChange = useCallback((value: boolean) => {
+    // Suspend only the native dialog, keeping chat, draft and selected tab mounted.
+    if (value) dialog.current?.close();
+    setSafetyOpen(value);
+  }, []);
 
   // Only UI onboarding is stored locally. Conversation/preferences stay on the server.
   useEffect(() => {
@@ -144,12 +152,12 @@ export function LumiWidget({ userId }: { userId: string }) {
   }, [reducedMotion, playSound]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || safetyOpen) return;
     const panel = dialog.current;
     const restoreFocus = trigger.current;
     if (panel && !panel.open) panel.showModal();
     return () => { panel?.close(); restoreFocus?.focus({ preventScroll: true }); };
-  }, [open]);
+  }, [open, safetyOpen]);
 
   useEffect(() => {
     if (!closing) return;
@@ -211,7 +219,8 @@ export function LumiWidget({ userId }: { userId: string }) {
   }
 
   return <>
-    <div className={styles.launcher}>
+    <LumiSafety userId={userId} blocked={open || busy || !!categoryHelp || unread.some(isPriorityEvent)} onOpenChange={onSafetyOpenChange} />
+    <div className={styles.launcher} data-safety-hidden={safetyOpen || undefined} aria-hidden={safetyOpen || undefined} inert={safetyOpen}>
       {intro && !open && <span className={styles.intro}>Lumi · Tu asistente energético</span>}
       <button ref={trigger} type="button" className={styles.trigger} aria-label="Abrir Lumi, tu asistente energético"
         aria-describedby="lumi-status"
@@ -225,8 +234,8 @@ export function LumiWidget({ userId }: { userId: string }) {
       <span id="lumi-status" className="sr-only" role="status">{LUMI_LABELS[state]}{unread.length ? `. ${unread.length} avisos pendientes.` : ''}</span>
     </div>
     {open && createPortal(
-      <dialog ref={dialog} id="lumi-panel" className={styles.panel} aria-labelledby="lumi-title"
-        data-closing={closing || undefined} data-reduced-motion={reducedMotion || undefined} inert={closing}
+      <dialog ref={dialog} id="lumi-panel" className={styles.panel} hidden={safetyOpen} aria-labelledby="lumi-title"
+        data-closing={closing || undefined} data-reduced-motion={reducedMotion || undefined} inert={closing || safetyOpen}
         onAnimationEnd={event => { if (event.target === event.currentTarget && closing) setOpen(false); }}
         onClickCapture={event => {
           const control = (event.target as HTMLElement).closest('button, input[type="checkbox"]');
@@ -246,6 +255,7 @@ export function LumiWidget({ userId }: { userId: string }) {
           <p>{state === 'alert' ? 'Revisá el detalle y la prioridad en Avisos.' : 'Consumo, consultas y recomendaciones en un solo lugar.'}</p></div>
         </div>
         <nav className={styles.tabs} aria-label="Secciones de Lumi">
+          <button type="button" onClick={() => window.dispatchEvent(new Event(OPEN_SAFETY))}>Consejos de seguridad</button>
           <button type="button" aria-pressed={tab === 'chat'} onClick={() => {setTab('chat');setCategoryHelp(null);}}>Chat</button>
           <button type="button" aria-pressed={tab === 'events'} onClick={() => setTab('events')}>Avisos{unread.length ? ` (${unread.length})` : ''}</button>
           <button type="button" aria-pressed={tab === 'preferences'} onClick={() => setTab('preferences')}>Preferencias</button>

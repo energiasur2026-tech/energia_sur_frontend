@@ -21,6 +21,7 @@ export function ProfileForm() {
   const [email, setEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
   const fetchProfile = useCallback(async () => {
@@ -67,6 +68,7 @@ export function ProfileForm() {
       setSaved(payload.profile as Profile);
       setDraft(payload.profile as Profile);
       setJustSaved(true);
+      setEditing(false);
       setError(null);
     } catch {
       setError('No se pudo guardar el perfil.');
@@ -82,6 +84,7 @@ export function ProfileForm() {
       <div className="flex items-center gap-2 mb-1">
         <UserRound className="h-4 w-4 text-accent" />
         <h2 className="text-sm font-semibold">Mis datos</h2>
+        {!editing && <button type="button" onClick={() => { setEditing(true); setJustSaved(false); }} className="ml-auto text-sm text-accent font-semibold py-2">Editar mis datos</button>}
       </div>
       <p className="text-xs text-muted leading-relaxed mb-5">
         {email
@@ -91,7 +94,7 @@ export function ProfileForm() {
 
       {error && (
         <p className="mb-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error}
+          {error} <button type="button" onClick={() => void fetchProfile()} className="underline">Reintentar carga</button>
         </p>
       )}
 
@@ -103,6 +106,7 @@ export function ProfileForm() {
                 {label}
               </span>
               <input
+                disabled={!editing || saving}
                 type={type}
                 autoComplete={autoComplete}
                 placeholder={placeholder}
@@ -118,13 +122,14 @@ export function ProfileForm() {
         <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-border-soft">
           <button
             type="submit"
-            disabled={!dirty || saving}
+            disabled={!editing || !dirty || saving}
             className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
             {saving ? 'Guardando…' : 'Guardar datos'}
           </button>
 
+          {editing && <button type="button" disabled={saving} onClick={() => { setDraft(saved ?? EMPTY_PROFILE); setEditing(false); }} className="text-sm text-muted py-2">Cancelar</button>}
           {justSaved && !dirty && (
             <span className="inline-flex items-center gap-1.5 text-xs text-ok">
               <Check className="h-4 w-4" />

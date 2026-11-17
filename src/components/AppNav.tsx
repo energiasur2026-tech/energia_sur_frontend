@@ -1,5 +1,6 @@
 'use client';
 
+import { useNavigationPreferences } from './NavigationPreferences';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -28,6 +29,7 @@ const LINKS = [
 ] as const;
 
 export function AppNav({ userEmail }: { userEmail: string | null }) {
+  const { position } = useNavigationPreferences();
   const pathname = usePathname();
   const router = useRouter();
   // El medidor elegido viaja en cada enlace de la barra. Sin esto, pasar de
@@ -44,12 +46,12 @@ export function AppNav({ userEmail }: { userEmail: string | null }) {
   return (
     <>
       <MobileHeader onLogout={onLogout} />
-      <TopNav
+      {position === 'side' ? <SideNav pathname={pathname} deviceId={deviceId} userEmail={userEmail} onLogout={onLogout} /> : <TopNav
         pathname={pathname}
         deviceId={deviceId}
         userEmail={userEmail}
         onLogout={onLogout}
-      />
+      />}
       <BottomNav pathname={pathname} deviceId={deviceId} />
     </>
   );
@@ -174,4 +176,15 @@ function BottomNav({ pathname, deviceId }: { pathname: string; deviceId: string 
       </ul>
     </nav>
   );
+}
+
+function SideNav({ pathname, deviceId, userEmail, onLogout }: { pathname: string; deviceId: string | null; userEmail: string | null; onLogout: () => void }) {
+  return <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-56 flex-col border-r border-border-soft bg-surface p-4 overflow-y-auto">
+    <div className="flex items-center gap-2 font-bold text-lg py-4"><Zap className="h-5 w-5 text-accent" />EnergIA Sur</div>
+    <div className="py-3"><MeterPicker /></div>
+    <nav aria-label="Navegación principal" className="flex flex-col gap-2 mt-3">
+      {LINKS.map(({ href, label, icon: Icon }) => <Link key={href} href={meterHref(href, deviceId)} aria-current={pathname === href ? 'page' : undefined} className={'flex items-center gap-3 rounded-xl px-3 py-3 text-sm focus-visible:outline-2 focus-visible:outline-accent ' + (pathname === href ? 'bg-accent-soft text-accent font-semibold' : 'text-muted hover:text-foreground')}><Icon className="h-4 w-4 shrink-0" />{label}</Link>)}
+    </nav>
+    <div className="mt-auto pt-6 space-y-4"><ThemeToggle /><p className="text-xs text-muted break-all">{userEmail}</p><button type="button" onClick={onLogout} className="flex items-center gap-2 text-sm py-3"><LogOut className="h-4 w-4" />Cerrar sesión</button></div>
+  </aside>;
 }

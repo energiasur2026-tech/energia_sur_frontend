@@ -44,6 +44,7 @@ export function ActiveEventsBanner() {
   return (
     <Link
       href="/eventos"
+      data-critical-active={critical ? "true" : undefined}
       className={`mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm transition-opacity hover:opacity-80 ${tone}`}
     >
       <TriangleAlert className="h-4 w-4 shrink-0" />

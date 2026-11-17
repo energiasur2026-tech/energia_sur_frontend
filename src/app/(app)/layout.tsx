@@ -1,3 +1,4 @@
+import { NavigationPreferences } from '@/components/NavigationPreferences';
 import {SelectedMeterName} from '@/components/SelectedMeterName';
 import { Suspense } from 'react';
 import { MeterContextBoundary } from '@/components/MeterContextBoundary';
@@ -33,8 +34,9 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   return (
     // `pb-nav` reserva en mobile el alto de la barra inferior fija, para que
     // el final del contenido no quede tapado detrás de ella.
-    <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><div className="flex-1 flex flex-col pb-nav">
+    <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><NavigationPreferences userId={user.id}><div className="flex-1 flex flex-col pb-nav">
       <AppNav userEmail={user.email} />
+      <div className="app-shell-content flex flex-1 flex-col">
       <MeterGoneBanner />
       <SelectedMeterName/>
       <div className="flex flex-1 flex-col pb-40">
@@ -44,6 +46,6 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
           cual sea la seccion a la que se llegue despues del login. */}
       <WelcomeDialog />
       <LumiWidget key={user.id} userId={user.id} />
-    </div></MeterContextBoundary></Suspense>
+    </div></div></NavigationPreferences></MeterContextBoundary></Suspense>
   );
 }
