@@ -25,18 +25,18 @@ type Props = {
   series: SeriesPoint[];
   bucketSeconds: number;
   metric: 'power' | 'voltage';
-  /** Umbrales de tensión; sin ellos no se dibujan las líneas de referencia. */
+  /** Umbrales de alerta configurados en el medidor; sin ellos no se dibujan. */
   thresholds?: MeterThresholds | null;
-  /** Potencia media que corresponde al objetivo mensual, si hay uno fijado. */
-  goalPowerW?: number | null;
+  /** Referencia estadística: potencia promedio observada en el rango visible. */
+  averagePowerW?: number | null;
   events?: EventRecord[];
   /** El usuario decide si ve las líneas de referencia o el gráfico limpio. */
   showReferences?: boolean;
 };
 
 const CONFIG = {
-  power: { key: 'avgPowerW', unit: 'W', decimals: 0, label: 'Potencia' },
-  voltage: { key: 'avgVoltage', unit: 'V', decimals: 1, label: 'Tensión' },
+  power: { key: 'avgPowerW', unit: 'W', decimals: 0, label: 'Potencia medida' },
+  voltage: { key: 'avgVoltage', unit: 'V', decimals: 1, label: 'Tensión medida' },
 } as const;
 
 export function HistoryChart({
@@ -44,7 +44,7 @@ export function HistoryChart({
   bucketSeconds,
   metric,
   thresholds = null,
-  goalPowerW = null,
+  averagePowerW = null,
   events = [],
   showReferences = true,
 }: Props) {
@@ -56,7 +56,7 @@ export function HistoryChart({
 
   if (series.length === 0) {
     return (
-      <div className="h-64 flex items-center justify-center text-sm text-muted">
+      <div className="h-full flex items-center justify-center text-sm text-muted">
         Sin lecturas registradas en este período.
       </div>
     );
@@ -85,13 +85,24 @@ export function HistoryChart({
         border: `1px solid ${colors.grid}`,
         borderRadius: 10,
         fontSize: 12,
+        maxWidth: 'min(15rem, 62vw)',
+        whiteSpace: 'normal',
       }}
       labelStyle={{ color: colors.axis }}
       labelFormatter={(label) => formatDateTime(typeof label === 'string' ? label : null)}
-      formatter={(value) => [
-        `${formatNumber(typeof value === 'number' ? value : null, config.decimals)} ${config.unit}`,
-        config.label,
-      ]}
+      formatter={(value) => {
+        const numeric = typeof value === 'number' ? value : null;
+        const formatted = `${formatNumber(numeric, config.decimals)} ${config.unit}`;
+        if (metric === 'voltage' && numeric !== null && thresholds) {
+          if (numeric < thresholds.lowVoltageV) {
+            return [`${formatted} (bajo umbral ${thresholds.lowVoltageV} V)`, config.label];
+          }
+          if (numeric > thresholds.highVoltageV) {
+            return [`${formatted} (sobre umbral ${thresholds.highVoltageV} V)`, config.label];
+          }
+        }
+        return [formatted, config.label];
+      }}
     />
   );
 
@@ -122,7 +133,7 @@ export function HistoryChart({
         .filter(Boolean)
     : null;
 
-  /** Líneas de referencia: umbrales de tensión, u objetivo en potencia. */
+  /** Líneas de referencia: umbrales de alerta de tensión (configurados) o referencia estadística de potencia. */
   const referenceLines =
     !showReferences
       ? null
@@ -135,7 +146,7 @@ export function HistoryChart({
               strokeDasharray="4 4"
               strokeWidth={1.5}
               label={{
-                value: `Mínimo ${thresholds.lowVoltageV} V`,
+                value: `Umbral alerta bajo ${thresholds.lowVoltageV} V`,
                 position: 'insideBottomLeft',
                 fill: colors.danger,
                 fontSize: 10,
@@ -148,25 +159,25 @@ export function HistoryChart({
               strokeDasharray="4 4"
               strokeWidth={1.5}
               label={{
-                value: `Máximo ${thresholds.highVoltageV} V`,
+                value: `Umbral alerta alto ${thresholds.highVoltageV} V`,
                 position: 'insideTopLeft',
                 fill: colors.danger,
                 fontSize: 10,
               }}
             />,
           ]
-        : metric === 'power' && goalPowerW
+        : metric === 'power' && averagePowerW !== null
           ? [
               <ReferenceLine
-                key="goal"
-                y={goalPowerW}
-                stroke={colors.ok}
-                strokeDasharray="6 4"
+                key="average"
+                y={averagePowerW}
+                stroke={colors.reference}
+                strokeDasharray="2 4"
                 strokeWidth={1.5}
                 label={{
-                  value: `Objetivo ${Math.round(goalPowerW)} W`,
+                  value: `Prom. rango ${Math.round(averagePowerW)} W`,
                   position: 'insideTopLeft',
-                  fill: colors.ok,
+                  fill: colors.reference,
                   fontSize: 10,
                 }}
               />,
@@ -192,7 +203,7 @@ export function HistoryChart({
   // alternar de metrica.
   if (metric === 'power') {
     return (
-      <ResponsiveContainer width="100%" height={256}>
+      <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
           <defs>
             <linearGradient id="powerFill" x1="0" y1="0" x2="0" y2="1">
@@ -221,7 +232,7 @@ export function HistoryChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={256}>
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
         {commonAxes}
         <YAxis width={54} domain={voltageDomain(thresholds, showReferences)} {...axis} />

@@ -80,7 +80,7 @@ export function ProfileForm() {
   const dirty = saved !== null && FIELDS.some(({ key }) => draft[key] !== saved[key]);
 
   return (
-    <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
+    <section data-unsaved={dirty} id="cuenta" className="scroll-mt-4 rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
       <div className="flex items-center gap-2 mb-1">
         <UserRound className="h-4 w-4 text-accent" />
         <h2 className="text-sm font-semibold">Mis datos</h2>

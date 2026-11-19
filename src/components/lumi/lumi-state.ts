@@ -8,6 +8,8 @@ export const LUMI_LABELS: Record<LumiState, string> = {
 
 export type LumiEvent = {
   id: string; type: string; at: string; evidence: string; question: string | null;
+  consultationStatus?: 'pending' | 'answered' | 'snoozed' | 'skipped'; resumeAt?: string;
+  active?: boolean;
   read: boolean; userLabels: string[]; answered?: boolean; answeredAt?: string | null; otherEquipment?: string; severity?: 'INFO' | 'WARNING' | 'CRITICAL';
 };
 export type LumiMemoryItem = {
@@ -51,13 +53,13 @@ export function resolveLumiState({ events, busy, success, greeting }: {
 }
 
 export function isConsultation(event: LumiEvent) {
-  return event.type === 'unusual_power' && !!event.question;
+  return event.type === 'unusual_power' && !!event.question && event.severity !== 'CRITICAL';
 }
 export function isAnswered(event: LumiEvent) {
   return event.answered ?? event.userLabels.length > 0;
 }
 export function isPendingEvent(event: LumiEvent) {
-  return isConsultation(event) ? !isAnswered(event) : !event.read;
+  return isConsultation(event) ? (event.consultationStatus ? event.consultationStatus === 'pending' : !isAnswered(event)) : !event.read;
 }
 export type EventFilter = 'all' | 'electrical' | 'consultations';
 export function matchesEventFilter(event: LumiEvent, filter: EventFilter) {

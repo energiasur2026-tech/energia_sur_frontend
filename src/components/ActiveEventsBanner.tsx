@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, TriangleAlert } from 'lucide-react';
 import { formatDuration } from '@/lib/format';
 import { EVENT_LABEL, type EventRecord } from '@/lib/event-types';
-import { apiUrl, useMeterId } from '@/lib/use-meter-id';
+import { apiUrl, meterHref, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 
 const POLL_INTERVAL_MS = 60000;
@@ -43,9 +43,9 @@ export function ActiveEventsBanner() {
 
   return (
     <Link
-      href="/eventos"
+      href={meterHref('/eventos', deviceId)}
       data-critical-active={critical ? "true" : undefined}
-      className={`mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm transition-opacity hover:opacity-80 ${tone}`}
+      className={`monitor-section flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-3 py-2 text-sm transition-opacity hover:opacity-80 ${tone}`}
     >
       <TriangleAlert className="h-4 w-4 shrink-0" />
       <span className="font-semibold">

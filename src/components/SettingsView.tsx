@@ -4,7 +4,7 @@ import { NavigationSettings } from './NavigationPreferences';
 import {MeterNameForm} from './MeterNameForm';
 import {SupplySettings} from './SupplySettings';
 import { useCallback, useState } from 'react';
-import { Bell, Check, Database, Gauge, MapPin, Palette, Save, SlidersHorizontal } from 'lucide-react';
+import { Bell, Check, Database, Gauge, MapPin, Save, SlidersHorizontal } from 'lucide-react';
 import {
   COLLECTION_INTERVALS,
   intervalLabel,
@@ -27,6 +27,12 @@ import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
 import { ProfileForm } from './ProfileForm';
 import { ReplaceThresholdsDialog } from './ReplaceThresholdsDialog';
+import Link from 'next/link';
+import type { SettingsCategory } from '@/lib/settings-categories';
+import { BillingCycleForm } from './BillingCycleForm';
+import { SettingsGoal } from './SettingsGoal';
+import { LUMI_OPEN_TAB } from '@/lib/lumi-open-tab';
+import { meterHref } from '@/lib/use-meter-id';
 import { ThemeToggle } from './ThemeToggle';
 import { SetupNotice } from './SetupNotice';
 
@@ -46,7 +52,8 @@ type Settings = {
 /** Solo se recarga si algo cambió por fuera; no es una pantalla en vivo. */
 const POLL_INTERVAL_MS = 300000;
 
-export function SettingsView() {
+export function SettingsView({category}:{category:SettingsCategory}) {
+  const readsMeter = category==='dispositivos'||category==='lumi';
   // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
   const deviceId = useMeterId();
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -66,6 +73,7 @@ export function SettingsView() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const fetchSettings = useCallback(async () => {
+    if (!readsMeter) return;
     try {
       const response = await fetch(apiUrl('/api/meter/settings', deviceId), { cache: 'no-store' });
       const payload = await response.json();
@@ -86,7 +94,7 @@ export function SettingsView() {
     } catch {
       setError({ error: 'No se pudo contactar al servidor.' });
     }
-  }, [deviceId]);
+  }, [deviceId, readsMeter]);
 
   usePolling(fetchSettings, POLL_INTERVAL_MS);
 
@@ -346,30 +354,30 @@ export function SettingsView() {
   const placementValid =
     placement !== null && (placement.role === 'central' || placement.areaLabel.trim() !== '');
 
-  return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-3xl w-full mx-auto">
-      <header className="mb-7">
-        <h1 className="text-xl md:text-2xl font-bold tracking-tight">Ajustes</h1>
-        <p className="text-sm text-muted mt-0.5">
-          Configuración del medidor {settings ? `· ${settings.name}` : ''}
+  return <>
+    {readsMeter&&!settings&&!error&&<p className="mb-4 text-sm text-muted">Consultando el medidor…</p>}
+    {error&&<p role="alert" className="mb-4 rounded-xl border border-danger/40 p-4 text-sm text-danger">{error.error} {!settings&&<button type="button" className="underline" onClick={()=>void fetchSettings()}>Reintentar</button>}</p>}
+    {category==='apariencia'&&(
+      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
+        <p className="text-xs text-muted leading-relaxed mb-4">
+          Elegí cómo se ve la aplicación. Si no elegís, sigue la configuración
+          de tu teléfono o computadora.
         </p>
-      </header>
-
-      {error && !error.missingEnv && (
-        <p className="mb-6 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error.error}
-        </p>
-      )}
-
+        <ThemeToggle variant="full" />
+        <NavigationSettings />
+      </section>
+    )}
+    {category==='dispositivos'&&<div data-unsaved={dirty||placementDirty}>
+      <section className="mb-6 rounded-2xl border border-border-soft bg-surface p-5">
+        <h3 className="text-sm font-semibold">Medidores vinculados</h3>
+        <p className="mt-2 text-xs text-muted">Consultá la última medición, administrá ambientes o vinculá y desvinculá equipos desde Mis dispositivos.</p>
+        <Link className="mt-3 inline-block text-sm text-accent underline" href={meterHref('/medidores',deviceId)}>Abrir Mis dispositivos</Link>
+      </section>
       {settings&&<MeterNameForm key={settings.deviceId+settings.name} name={settings.name} isOwner={settings.isOwner===true} onSaved={()=>void fetchSettings()}/>}
-      <SupplySettings key={deviceId??'default'}/>
-      <NavigationSettings />
-      <ProfileForm />
-
       <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
         <div className="flex items-center gap-2 mb-1">
           <MapPin className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Alcance de medición</h2>
+          <h3 className="text-sm font-semibold" id="ubicacion-dispositivo">Alcance de medición</h3>
           <InfoTooltip
             title="Dónde está el medidor"
             text="En el tablero central mide todo lo que consume el lugar, y su consumo se contrasta contra la factura del mes. En un área mide solo ese sector: ahí lo que importa es la energía, porque un área no es una factura aparte."
@@ -449,11 +457,10 @@ export function SettingsView() {
           )}
         </div>
       </section>
-
       <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
         <div className="flex items-center gap-2 mb-1">
           <Gauge className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Tipo de equipo</h2>
+          <h3 className="text-sm font-semibold">Tipo de equipo</h3>
           <InfoTooltip
             title="Tipo de equipo"
             text="Monofásico es lo habitual en instalaciones chicas; trifásico aparece donde hay maquinaria o equipos grandes. Por ahora el dato queda registrado: las pantallas muestran una sola medición, no una por fase."
@@ -492,11 +499,119 @@ export function SettingsView() {
           </p>
         )}
       </section>
+      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Database className="h-4 w-4 text-accent" />
+          <h3 className="text-sm font-semibold">Frecuencia de guardado</h3>
+          <InfoTooltip title="Frecuencia de guardado" text="Cada cuánto se guarda una lectura en la base. No cambia la frecuencia con la que la pantalla muestra valores en vivo: el Monitor se sigue actualizando cada 5 segundos." />
+        </div>
+        <p className="text-xs text-muted leading-relaxed mb-5">
+          Guardar más seguido da gráficos con más detalle, pero consume más
+          espacio y tráfico de la base. Guardar más espaciado cuida los límites
+          del plan gratuito a costa de un histórico más grueso.
+        </p>
 
+        <div className="space-y-2 mb-5">
+          {COLLECTION_INTERVALS.map((option) => {
+            const isSelected = selected === option.minutes;
+            return (
+              <label
+                key={option.minutes}
+                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
+                  isSelected
+                    ? 'border-accent bg-accent-soft/40'
+                    : 'border-border-soft bg-surface-raised hover:border-muted/40'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="interval"
+                    className="accent-accent"
+                    checked={isSelected}
+                    onChange={() => setSelected(option.minutes)}
+                  />
+                  <span className="text-sm font-medium">{option.label}</span>
+                </span>
+                <span className="text-xs text-muted tabular-nums">
+                  ~{rowsPerDay(option.minutes).toLocaleString('es-AR')} filas/día
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-border-soft">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!dirty || saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+
+          {savedAt !== null && !dirty && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-ok">
+              <Check className="h-4 w-4" />
+              Guardado. Aplica desde el próximo ciclo.
+            </span>
+          )}
+
+          {settings && !dirty && savedAt === null && (
+            <span className="text-xs text-muted">
+              Actual: {intervalLabel(settings.collectionIntervalMinutes)}
+            </span>
+          )}
+        </div>
+
+        <p className="mt-4 text-xs text-muted leading-relaxed">
+          El conteo de filas cuenta los dos orígenes que escriben: el recolector
+          programado y el sondeo del dashboard mientras alguien lo tiene
+          abierto. Cada uno lleva su propio ritmo.
+        </p>
+      </section>
+    </div>}
+    {category==='servicio'&&<><SupplySettings/><BillingCycleForm/></>}
+    {category==='objetivos'&&<SettingsGoal/>}
+    {category==='lumi'&&<div data-unsaved={ownRange!==null}>
+      <section className="mb-6 rounded-2xl border border-border-soft bg-surface p-5">
+        <h3 className="text-sm font-semibold">Asistente Lumi</h3>
+        <p className="mt-2 text-xs text-muted">Administrá el estilo de respuesta, sonidos, memoria e historial del asistente. Las reglas de alerta del medidor se configuran abajo.</p>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm text-accent underline">
+          <button type="button" onClick={()=>window.dispatchEvent(new CustomEvent(LUMI_OPEN_TAB,{detail:'preferences'}))}>Abrir preferencias de Lumi</button>
+          <button type="button" onClick={()=>window.dispatchEvent(new CustomEvent(LUMI_OPEN_TAB,{detail:'events'}))}>Ver avisos y consultas pendientes</button>
+        </div>
+      </section>
+      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Bell className="h-4 w-4 text-accent" />
+          <h3 className="text-sm font-semibold">Avisos por email</h3>
+          <InfoTooltip title="Avisos por email" text="Te llega un correo cuando se detecta una anomalía en tu instalación: tensión fuera de rango o corriente excesiva. Los huecos cortos de datos no generan aviso, para no llenarte la casilla de ruido." />
+        </div>
+        <p className="text-xs text-muted leading-relaxed mb-4">
+          Recibís un correo cuando aparece una anomalía nueva, a la casilla con
+          la que iniciás sesión.
+        </p>
+
+        <label className="flex items-center justify-between gap-3 rounded-xl border border-border-soft bg-surface-raised px-4 py-3 cursor-pointer">
+          <span className="text-sm font-medium">
+            {settings?.alertsEnabled ? 'Avisos activados' : 'Avisos desactivados'}
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-accent"
+            checked={settings?.alertsEnabled ?? false}
+            disabled={!settings}
+            onChange={(e) => onToggleAlerts(e.target.checked)}
+          />
+        </label>
+      </section>
       <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
         <div className="flex items-center gap-2 mb-1">
           <SlidersHorizontal className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Sensibilidad de las alertas</h2>
+          <h3 className="text-sm font-semibold">Sensibilidad de las alertas</h3>
           <InfoTooltip
             title="Sensibilidad de las alertas"
             text="Define cuán lejos de los 220 V tiene que irse la tensión para que se registre una anomalía. Es un umbral de aviso del producto, no un límite normativo: salir del rango elegido no significa que haya peligro, significa que pediste enterarte."
@@ -683,118 +798,6 @@ export function SettingsView() {
           </div>
         )}
       </section>
-
-      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Bell className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Avisos por email</h2>
-          <InfoTooltip title="Avisos por email" text="Te llega un correo cuando se detecta una anomalía en tu instalación: tensión fuera de rango o corriente excesiva. Los huecos cortos de datos no generan aviso, para no llenarte la casilla de ruido." />
-        </div>
-        <p className="text-xs text-muted leading-relaxed mb-4">
-          Recibís un correo cuando aparece una anomalía nueva, a la casilla con
-          la que iniciás sesión.
-        </p>
-
-        <label className="flex items-center justify-between gap-3 rounded-xl border border-border-soft bg-surface-raised px-4 py-3 cursor-pointer">
-          <span className="text-sm font-medium">
-            {settings?.alertsEnabled ? 'Avisos activados' : 'Avisos desactivados'}
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-accent"
-            checked={settings?.alertsEnabled ?? false}
-            disabled={!settings}
-            onChange={(e) => onToggleAlerts(e.target.checked)}
-          />
-        </label>
-      </section>
-
-      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6 mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Palette className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Apariencia</h2>
-        </div>
-        <p className="text-xs text-muted leading-relaxed mb-4">
-          Elegí cómo se ve la aplicación. Si no elegís, sigue la configuración
-          de tu teléfono o computadora.
-        </p>
-        <ThemeToggle variant="full" />
-      </section>
-
-      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Database className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold">Frecuencia de guardado</h2>
-          <InfoTooltip title="Frecuencia de guardado" text="Cada cuánto se guarda una lectura en la base. No cambia la frecuencia con la que la pantalla muestra valores en vivo: el Monitor se sigue actualizando cada 5 segundos." />
-        </div>
-        <p className="text-xs text-muted leading-relaxed mb-5">
-          Guardar más seguido da gráficos con más detalle, pero consume más
-          espacio y tráfico de la base. Guardar más espaciado cuida los límites
-          del plan gratuito a costa de un histórico más grueso.
-        </p>
-
-        <div className="space-y-2 mb-5">
-          {COLLECTION_INTERVALS.map((option) => {
-            const isSelected = selected === option.minutes;
-            return (
-              <label
-                key={option.minutes}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
-                  isSelected
-                    ? 'border-accent bg-accent-soft/40'
-                    : 'border-border-soft bg-surface-raised hover:border-muted/40'
-                }`}
-              >
-                <span className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="interval"
-                    className="accent-accent"
-                    checked={isSelected}
-                    onChange={() => setSelected(option.minutes)}
-                  />
-                  <span className="text-sm font-medium">{option.label}</span>
-                </span>
-                <span className="text-xs text-muted tabular-nums">
-                  ~{rowsPerDay(option.minutes).toLocaleString('es-AR')} filas/día
-                </span>
-              </label>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-border-soft">
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={!dirty || saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </button>
-
-          {savedAt !== null && !dirty && (
-            <span className="inline-flex items-center gap-1.5 text-xs text-ok">
-              <Check className="h-4 w-4" />
-              Guardado. Aplica desde el próximo ciclo.
-            </span>
-          )}
-
-          {settings && !dirty && savedAt === null && (
-            <span className="text-xs text-muted">
-              Actual: {intervalLabel(settings.collectionIntervalMinutes)}
-            </span>
-          )}
-        </div>
-
-        <p className="mt-4 text-xs text-muted leading-relaxed">
-          El conteo de filas cuenta los dos orígenes que escriben: el recolector
-          programado y el sondeo del dashboard mientras alguien lo tiene
-          abierto. Cada uno lleva su propio ritmo.
-        </p>
-      </section>
-
       <ReplaceThresholdsDialog
         open={pendingSensitivity !== null}
         target={pendingSensitivity}
@@ -806,6 +809,14 @@ export function SettingsView() {
           if (elegido) applySensitivity(elegido);
         }}
       />
-    </div>
-  );
+
+    </div>}
+    {category==='mis-datos'&&<>
+      <ProfileForm/>
+      <section className="rounded-2xl border border-border-soft bg-surface p-5">
+        <h3 className="text-sm font-semibold">Seguridad de la cuenta</h3>
+        <Link href="/recuperar-clave" className="mt-3 inline-block text-sm text-accent underline">Cambiar contraseña por correo</Link>
+      </section>
+    </>}
+  </>;
 }

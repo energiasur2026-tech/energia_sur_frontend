@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Archive, ChevronDown, CircleHelp, Droplets, Plug, type LucideIcon } from 'lucide-react';
+import { Archive, CheckCircle2, ChevronDown, CircleHelp, Droplets, Plug, type LucideIcon } from 'lucide-react';
 import { APPLIANCES_BY_ID } from '@/lib/home-catalog';
 import { formatLumiDate, isAnswered, isElectricalEvent, isConsultation, isPendingEvent, isPriorityEvent, matchesEventFilter, toggleEquipment, type EventFilter, type LumiEvent } from './lumi-state';
 import styles from './lumi.module.css';
@@ -21,11 +21,18 @@ const EQUIPMENT: { label: string; Icon: LucideIcon | typeof Kettle }[] = [
 ];
 export type LumiAction = Record<string, unknown>;
 type Props = { events: LumiEvent[]; busy: boolean; onAction: (action: LumiAction) => Promise<boolean> };
+type EventView = 'pending' | 'history' | 'answered' | 'snoozed' | 'skipped';
 const formatDate = formatLumiDate;
+const consultationEmptyMessages = {
+  answered: 'Todavía no hay consultas respondidas',
+  snoozed: 'No tenés consultas pospuestas',
+  skipped: 'No hay consultas omitidas',
+};
 
 export function LumiEvents({ events, busy, onAction }: Props) {
   const [filter, setFilter] = useState<EventFilter>('all');
-  const [view, setView] = useState<'pending' | 'history'>('pending');
+  const [view, setView] = useState<EventView>('pending');
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const [notice, setNotice] = useState('');
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -39,8 +46,13 @@ export function LumiEvents({ events, busy, onAction }: Props) {
   const anchor = useRef<{ removed: string; next?: string; offset: number; scrollTop: number } | null>(null);
   const filtered = events.filter(event => matchesEventFilter(event, filter));
   const pendingCount = filtered.filter(isPendingEvent).length;
+  const emptyMessage = view === 'history' ? 'Todavía no hay registros en el historial'
+    : view !== 'pending' ? consultationEmptyMessages[view]
+    : filter === 'consultations' ? 'No tenés consultas pendientes'
+    : filter === 'electrical' ? 'No tenés avisos eléctricos pendientes'
+    : 'No tenés avisos ni consultas pendientes';
   // History includes every stored event, including pending ones.
-  const visible = filtered.filter(event => view === 'history' || isPendingEvent(event))
+  const visible = filtered.filter(event => view === 'history' || (view === 'pending' ? isPendingEvent(event) : isConsultation(event) && (event.consultationStatus ?? (isAnswered(event) ? 'answered' : 'pending')) === view))
     .sort((a, b) => Number(isPriorityEvent(b)) - Number(isPriorityEvent(a)) || Date.parse(b.at) - Date.parse(a.at));
   useLayoutEffect(() => {
     const saved = anchor.current;
@@ -73,32 +85,71 @@ export function LumiEvents({ events, busy, onAction }: Props) {
     try {
       const ok = await onAction(action);
       if (!ok) anchor.current = null;
+      if (action.action === 'consultation') {
+        setLastSaved(null);
+        setNotice(ok ? action.operation === 'snooze' ? 'Pospuesta por 24 horas.' : 'Consulta omitida.' : 'No se pudo actualizar la consulta.');
+      }
       return ok;
     } catch { anchor.current = null; return false; }
   }
   function toggle(id: string) {
     setExpanded(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
+  function selectView(nextView: EventView) {
+    anchor.current = null;
+    if (list.current) list.current.scrollTop = 0;
+    setView(nextView);
+  }
   return <section className={styles.eventsLayout} aria-label="Avisos y consultas">
     <div className={styles.eventFilters}>
-      <p className={styles.note}>Horarios de Argentina · UTC−3 · formato 24 h</p>
-      <div className={styles.filterRow} role="group" aria-label="Tipo de aviso">
+      <div className={styles.eventFilterMeta}>
+        <p className={styles.note}>Hora argentina · UTC−3</p>
+        {filter === 'consultations' && pendingCount > 0 && !confirmSkip && (
+          <button type="button" className={styles.note} disabled={busy} onClick={() => setConfirmSkip(true)}>Omitir consultas pendientes</button>
+        )}
+      </div>
+      <div className={`${styles.filterRow} ${styles.categoryFilters}`} role="group" aria-label="Tipo de aviso">
         {([['all', 'Todos'], ['electrical', 'Avisos eléctricos'], ['consultations', 'Consultas']] as const).map(([key, label]) =>
-          <button key={key} type="button" aria-pressed={filter === key} onClick={() => { anchor.current = null; setFilter(key); }}>{label} ({events.filter(event => matchesEventFilter(event, key) && isPendingEvent(event)).length})</button>)}
+          <button key={key} type="button" aria-pressed={filter === key} onClick={() => { setConfirmSkip(false); setFilter(key); selectView('pending'); }}>{label} ({events.filter(event => matchesEventFilter(event, key) && isPendingEvent(event)).length})</button>)}
       </div>
       <div className={styles.filterRow} role="group" aria-label="Estado de avisos">
-        <button type="button" className={styles.pendingView} aria-pressed={view === 'pending'} onClick={() => { anchor.current = null; setView('pending'); }}>Pendientes ({pendingCount})</button>
-        <button type="button" className={styles.historyView} aria-pressed={view === 'history'} onClick={() => { anchor.current = null; setView('history'); }}><Archive aria-hidden="true" size={16} />Historial ({filtered.length})</button>
+        <button type="button" className={styles.pendingView} aria-pressed={view === 'pending'} onClick={() => selectView('pending')}>Pendientes ({pendingCount})</button>
+        <button type="button" className={styles.historyView} aria-pressed={view === 'history'} onClick={() => selectView('history')}><Archive aria-hidden="true" size={16} />Historial ({filtered.length})</button>
       </div>
+      {filter === 'consultations' && <>
+        <div className={`${styles.filterRow} ${styles.secondaryFilters}`} role="group" aria-label="Estado de consultas">
+          {([['answered', 'Respondidas'], ['snoozed', 'Pospuestas'], ['skipped', 'Omitidas']] as const).map(([key, label]) =>
+            <button key={key} type="button" aria-pressed={view === key} onClick={() => selectView(key)}>{label}</button>)}
+        </div>
+        {confirmSkip && <div role="group" aria-label="Confirmar omisión de consultas">
+          <p className={styles.note}>¿Querés omitir las consultas pendientes? Podrás revisarlas en el historial.</p>
+          <div className={styles.eventActions}>
+            <button type="button" disabled={busy} onClick={() => setConfirmSkip(false)}>Cancelar</button>
+            <button type="button" disabled={busy} onClick={async () => {
+              const saved = await onAction({ action: 'consultation', operation: 'skipPending' });
+              if (saved) setConfirmSkip(false);
+              setNotice(saved ? 'Consultas pendientes omitidas.' : 'No se pudieron omitir las consultas.');
+            }}>Omitir consultas</button>
+          </div>
+        </div>}
+      </>}
       <div className={styles.eventNotice} role="status" aria-live="polite">
-        <span>{notice}</span>
+        {notice && <span>{notice}</span>}
         {lastSaved && notice === 'Respuesta guardada' && view === 'pending' && <button type="button" onClick={() => { anchor.current = null; historyTarget.current = lastSaved; setView('history'); setExpanded(previous => new Set(previous).add(lastSaved)); }}>Ver en historial</button>}
       </div>
     </div>
     <div ref={list} className={styles.eventList} tabIndex={-1} aria-label={view === 'pending' ? 'Elementos pendientes' : 'Historial de avisos'}>
-      {!visible.length && <p className={styles.empty}>{view === 'pending' && filter !== 'electrical' && !filtered.some(event => isConsultation(event) && isPendingEvent(event)) ? 'No tenés consultas pendientes' : 'No hay elementos en este filtro.'}</p>}
+      {!visible.length && (
+        <div className={styles.eventsEmpty}>
+          {view === 'pending' && <CheckCircle2 size={18} aria-hidden="true" />}
+          <div>
+            {view === 'pending' && <h3>¡Estás al día!</h3>}
+            <p>{emptyMessage}</p>
+          </div>
+        </div>
+      )}
       {visible.map(event => <LumiEventCard key={event.id} event={event} busy={busy} onAction={action => act(event.id, action)}
-        compact={view === 'history'} expanded={expanded.has(event.id)} onToggle={() => toggle(event.id)}
+        compact={view !== 'pending'} expanded={expanded.has(event.id)} onToggle={() => toggle(event.id)}
         onSaved={() => { setLastSaved(event.id); setNotice('Respuesta guardada'); }}
         onWithdrawn={() => { setLastSaved(null); setNotice('Respuesta retirada. La consulta vuelve a estar pendiente.'); }}
         onReadChange={read => { setLastSaved(null); setNotice(read ? 'Aviso marcado como leído. Sigue en el historial; no se considera resuelto.' : 'Aviso marcado como no leído.'); }} />)}
@@ -130,7 +181,7 @@ export function LumiEventCard({ event, busy, onAction, onSaved, onWithdrawn, onR
     else if (kind === 'withdraw') { setEditing(false); setLabels([]); setOther(''); onWithdrawn(); }
     else onReadChange(action.read as boolean);
   }
-  const stateLabel = consultation ? answered ? 'Respondida' : 'Sin responder' : event.read ? 'Leído' : 'No leído';
+  const stateLabel = consultation ? answered ? 'Respondida' : event.consultationStatus === 'skipped' ? 'Omitida' : event.consultationStatus === 'snoozed' ? 'Pospuesta' : 'Sin responder' : event.read ? 'Leído' : 'No leído';
   const severity = event.severity === 'CRITICAL' ? 'Crítico' : event.severity === 'WARNING' || isPriorityEvent(event) ? 'Atención' : 'Informativo';
   const title = consultation ? 'Consulta sobre tu consumo' : isElectricalEvent(event) ? 'Aviso eléctrico' : 'Aviso de consumo';
   return <article className={styles.event} data-event-id={event.id} tabIndex={-1} data-history={compact || undefined} data-priority={isPriorityEvent(event)} data-pending={isPendingEvent(event)}>
@@ -139,11 +190,18 @@ export function LumiEventCard({ event, busy, onAction, onSaved, onWithdrawn, onR
       <ChevronDown aria-hidden="true" size={20} />
     </button> : <strong>{title}</strong>}
     <div id={'lumi-event-' + event.id} hidden={compact && !expanded}>
-    <div className={styles.eventBadges}><span>{severity}</span><span>{stateLabel}</span></div>
+    <div className={styles.eventBadges}><span>{severity}</span><span>{stateLabel}</span>
+      {isElectricalEvent(event) && event.active !== undefined && <span>{event.active ? 'Activo según las lecturas' : 'Resuelto'}</span>}
+    </div>
     <time dateTime={event.at}>Evento: {formatDate(event.at)}</time>
     <p>{event.evidence}</p>
     {consultation ? <>
       <p>{event.question}</p>
+      {isPendingEvent(event) && <div className={styles.eventActions}>
+        <button type="button" disabled={disabled} onClick={() => void onAction({ action: 'consultation', operation: 'snooze', eventId: event.id })}>Posponer 24 h</button>
+        <button type="button" disabled={disabled} onClick={() => void onAction({ action: 'consultation', operation: 'skip', eventId: event.id })}>Omitir esta consulta</button>
+      </div>}
+      {event.resumeAt && <p className={styles.note}>Pospuesta hasta {formatDate(event.resumeAt)}</p>}
       {answered && !editing ? <>
         <p><b>Tu respuesta:</b> {event.userLabels.join(', ')}{event.otherEquipment ? ' · ' + event.otherEquipment : ''}</p>
         {event.answeredAt ? <time dateTime={event.answeredAt}>Respuesta modificada: {formatDate(event.answeredAt)}</time> : <p className={styles.note}>Respuesta anterior: fecha de envío no registrada.</p>}
@@ -174,7 +232,7 @@ export function LumiEventCard({ event, busy, onAction, onSaved, onWithdrawn, onR
         <button type="button" disabled={disabled} onClick={() => { setConfirmWithdraw(false); setError(''); setRetry(null); }}>Cancelar</button></div>
       </div>}
     </> : <>
-      <button disabled={disabled} type="button" onClick={() => void commit({ action: 'read', eventId: event.id, read: !event.read }, 'read')}>{event.read ? 'Marcar como no leído' : 'Marcar como leído'}</button>
+      <button className={styles.readButton} disabled={disabled} type="button" onClick={() => void commit({ action: 'read', eventId: event.id, read: !event.read }, 'read')}>{event.read ? 'Marcar como no leído' : 'Marcar como leído'}</button>
       <p className={styles.note}>La lectura no elimina ni resuelve este aviso.</p>
     </>}
     {error && <div className={styles.error} role="alert"><p>{error}</p>{retry && <button type="button" disabled={disabled} onClick={() => void commit(retry.action, retry.kind)}>Reintentar guardado</button>}</div>}

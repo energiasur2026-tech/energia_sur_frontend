@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check, Gauge, House, Layers, Link2Off, MapPin, Plus, Target, TriangleAlert, Zap } from 'lucide-react';
-import { formatNumber, formatRelativeMinutes, NO_DATA } from '@/lib/format';
+import { ArrowRight, Check, Gauge, House, Layers, Link2Off, MoreHorizontal, Plus, Target, TriangleAlert, Zap } from 'lucide-react';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import type { GoalProgress } from '@/lib/goal';
 import type { HomeSummary } from '@/domain/home-types';
 import { PHASE_LABEL, type MeterPhases } from '@/domain/installation-types';
-import { ROLE_LABEL, type MeterRole } from '@/domain/meter-role';
+import { type MeterRole } from '@/domain/meter-role';
 import type { ApiErrorPayload } from '@/lib/types';
 import { meterHref } from '@/lib/use-meter-id';
+import { DeviceArt, deviceKinds, type DeviceKind } from './DeviceArt';
+import { groupDevices, readAssignments, readingStatus } from '@/lib/device-inventory';
 import { usePolling } from '@/lib/use-polling';
 import { InfoTooltip } from './InfoTooltip';
 import { LinkMeterForm, type LinkResult } from './LinkMeterForm';
@@ -24,6 +26,8 @@ type MeterSummary = {
   name: string;
   latest: { recordedAt: string; voltage: number | null; powerW: number | null } | null;
   activeEvents: number;
+  collectionIntervalMinutes?:number;
+  syncError?:boolean;
   goal: GoalProgress;
   home: HomeSummary;
   role: MeterRole;
@@ -39,7 +43,52 @@ type MeterSummary = {
   isOwner: boolean;
 };
 
-export function MetersView() {
+const assignmentEvent='energia:inventory-assignment';
+const primary='inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+function subscribeAssignments(onChange:()=>void) {
+  window.addEventListener('storage',onChange);
+  window.addEventListener(assignmentEvent,onChange);
+  return ()=>{window.removeEventListener('storage',onChange);window.removeEventListener(assignmentEvent,onChange);};
+}
+const emptyAssignments=()=> '{}';
+const physicalKinds={general:'Medidor de tablero',circuit:'Submedidor',plug:'Enchufe inteligente'} as const;
+function storedInventory(key:string) {
+  try{return localStorage.getItem(key)??'{}';}catch{return '{}';}
+}
+
+export function MetersView({userId}:{userId:string}) {
+  const assignmentKey='energia:device-places:v1:'+userId;
+  const kindKey='energia:device-hardware:v1:'+userId;
+  const raw=useSyncExternalStore(subscribeAssignments,()=>storedInventory(assignmentKey),emptyAssignments);
+  const rawKinds=useSyncExternalStore(subscribeAssignments,()=>storedInventory(kindKey),emptyAssignments);
+  const assignments=readAssignments(raw);
+  const assignedKinds=readAssignments(rawKinds);
+  const [filter,setFilter]=useState('all');
+  const [linkOpen,setLinkOpen]=useState(false);
+  const wizardRef=useRef<HTMLDivElement>(null);
+  const [assignmentError,setAssignmentError]=useState('');
+  const [renamingPlace,setRenamingPlace]=useState<string|null>(null);
+  const [place,setPlace]=useState('');
+  const [hardware,setHardware]=useState('');
+  function assign(deviceId:string,group:string,key=assignmentKey) {
+    try {
+      const next=readAssignments(localStorage.getItem(key)??'{}');
+      if(group.trim())Object.defineProperty(next,deviceId,{value:group.trim(),enumerable:true,configurable:true,writable:true});
+      else delete next[deviceId];
+      localStorage.setItem(key,JSON.stringify(next));
+      window.dispatchEvent(new Event(assignmentEvent));
+      setAssignmentError('');
+      return true;
+    } catch {
+      setAssignmentError('No pudimos guardar la organización del dispositivo en este navegador.');
+      return false;
+    }
+  }
+  function openWizard() {
+    setLinkOpen(true);
+    requestAnimationFrame(()=>wizardRef.current?.focus());
+  }
+
   const [meters, setMeters] = useState<MeterSummary[] | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   /** El medidor cuya baja se está confirmando. */
@@ -98,14 +147,26 @@ export function MetersView() {
 
   if (error?.missingEnv) return <SetupNotice missing={error.missingEnv} />;
 
+  const groups=groupDevices(meters??[],assignments);
+  const supplies=groups.flatMap(group=>group.name?[group.name]:[]);
+  const visibleGroups=filter==='all'||!groups.some(group=>'supply:'+group.id===filter)?groups:groups.filter(group=>'supply:'+group.id===filter);
   return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto">
-      <header className="mb-5 md:mb-7">
-        <h1 className="text-xl md:text-2xl font-bold tracking-tight">Mis medidores</h1>
-        <p className="text-sm text-muted mt-0.5">
-          Los medidores de tu domicilio, de un vistazo
-        </p>
+    <div className="mx-auto w-full min-w-0 max-w-7xl flex-1 p-4 md:p-6 lg:p-8">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Mis dispositivos</h1>
+          <p className="mt-1 text-sm text-muted">Administrá tus medidores y conocé qué está consumiendo energía.</p>
+        </div>
+        <button type="button" onClick={openWizard} className={primary}><Plus size={17} aria-hidden="true"/>Vincular dispositivo</button>
       </header>
+
+      {assignmentError&&<p role="alert" className="mb-4 text-sm text-danger">{assignmentError}</p>}
+      {linkOpen&&<div ref={wizardRef} tabIndex={-1}>
+        <LinkMeterForm supplies={supplies} onClose={()=>setLinkOpen(false)} onLinked={result=>{
+          if(result.supply)assign(result.deviceId,result.supply);
+          setLinked(result);setUnlinked(null);setLinkOpen(false);setFilter('all');void fetchMeters();
+        }}/>
+      </div>}
 
       {error && !error.missingEnv && (
         <p className="mb-6 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -166,53 +227,59 @@ export function MetersView() {
         </div>
       )}
 
-      {!meters && <p className="text-center text-sm text-muted py-16">Cargando…</p>}
+      {!meters&&!error&&<p role="status" className="py-12 text-center text-sm text-muted">Consultando tus dispositivos…</p>}
+      {error&&!meters&&<button type="button" onClick={()=>void fetchMeters()} className="text-sm text-accent underline">Reintentar</button>}
 
-      {meters?.length === 0 && (
-        <>
-          <div className="rounded-2xl border border-border-soft bg-surface p-10 text-center">
-            <Gauge className="h-8 w-8 text-muted mx-auto mb-3" />
-            <p className="text-sm font-medium">Todavía no tenés medidores vinculados.</p>
-            <p className="mt-1 text-xs text-muted">
-              Sumá el tuyo con el identificador impreso en el equipo.
-            </p>
+      {meters?.length===0&&!linkOpen&&<section className="rounded-2xl border border-border-soft bg-surface p-8 text-center">
+        <DeviceArt kind="general" className="mx-auto h-32 w-52 max-w-full" decorative/>
+        <h2 className="mt-3 text-lg font-semibold">Empezá a conocer tu consumo eléctrico</h2>
+        <p className="mt-2 text-sm text-muted">Vinculá tu primer dispositivo para comenzar a monitorear tu energía.</p>
+        <button type="button" className={primary+' mt-4'} onClick={openWizard}>Vincular mi primer dispositivo</button>
+      </section>}
+
+      {groups.length>1&&<label className="mb-5 flex flex-wrap items-center gap-3 text-sm font-semibold">Suministro
+        <select value={visibleGroups===groups?'all':filter} onChange={event=>setFilter(event.target.value)} className="max-w-full rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm">
+          <option value="all">Todos los suministros</option>
+          {groups.map(group=><option value={'supply:'+group.id} key={group.id}>{group.name||'Sin suministro asignado'}</option>)}
+        </select>
+      </label>}
+
+      <div className="space-y-7">
+        {visibleGroups.map(group=><section key={group.id} aria-label={group.name||'Sin suministro asignado'}>
+          <div className="mb-3 flex items-center gap-3">
+            <House size={18} className="text-accent" aria-hidden="true"/>
+            <h2 className="min-w-0 break-words text-lg font-semibold">{group.name||'Sin suministro asignado'}</h2>
           </div>
-        </>
-      )}
-
-      {meters && meters.length > 0 && (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-fade-in">
-            {meters.map((meter) => (
-              <MeterCard
-                key={meter.deviceId}
-                meter={meter}
-                onUnlink={() => setUnlinking(meter)}
-              />
-            ))}
+          <p className="mb-4 text-xs text-muted">{group.name
+            ? group.meters.filter(meter=>meter.role==='central').length===1
+              ? 'El medidor general representa el total de la instalación. Los circuitos muestran su propio consumo.'
+              : 'Cada dispositivo muestra su medición. El total del suministro requiere un medidor general confirmado.'
+            :'Asigná un suministro desde el menú de cada dispositivo.'}</p>
+          <div className="device-inventory-grid grid gap-4">
+            {group.meters.map(meter=><MeterCard key={meter.deviceId} meter={meter} supply={group.name}
+              hardware={Object.hasOwn(physicalKinds,assignedKinds[meter.deviceId])?assignedKinds[meter.deviceId] as DeviceKind:undefined}
+              onUnlink={()=>setUnlinking(meter)} onGroup={()=>{setPlace(group.name);setHardware(assignedKinds[meter.deviceId]??'');setRenamingPlace(meter.deviceId);}}>
+              {renamingPlace===meter.deviceId&&<form className="mt-3" onSubmit={event=>{
+                event.preventDefault();
+                if(assign(meter.deviceId,place)&&assign(meter.deviceId,hardware,kindKey)){setRenamingPlace(null);setFilter('all');}
+              }}>
+                <label className="block text-sm">Suministro o lugar<input value={place} onChange={event=>setPlace(event.target.value)}
+                  maxLength={60} className="mt-1 block w-full rounded-lg border border-border-soft bg-surface-raised p-2"/></label>
+                <label className="mt-2 block text-sm">Tipo físico<select value={hardware} onChange={event=>setHardware(event.target.value)} className="mt-1 block w-full rounded-lg border border-border-soft bg-surface-raised p-2">
+                  <option value="">Sin confirmar</option>{Object.entries(physicalKinds).map(([key,label])=><option key={key} value={key}>{label}</option>)}
+                </select></label>
+                <p className="mt-1 text-xs text-muted">La función de medición se cambia en Ajustes del dispositivo.</p>
+                <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                  <button className="font-semibold text-accent" type="submit">Guardar organización</button>
+                  <button className="text-muted" type="button" onClick={()=>setRenamingPlace(null)}>Cancelar</button>
+                </div>
+              </form>}
+            </MeterCard>)}
           </div>
-
-        </>
-      )}
-
-      {/* Fuera de las dos ramas a propósito: dibujarlo dentro de cada una lo
-          desmonta al vincular el primer medidor —la lista deja de estar
-          vacía y cambia la rama— y se pierde el aviso de cuántas mediciones
-          anteriores se recuperaron, que es lo que el usuario necesita leer
-          justo en ese momento. */}
-      {meters && (
-        <div className="mt-6">
-          <LinkMeterForm
-            onLinked={(result) => {
-              setLinked(result);
-              // Los dos avisos juntos contarían dos historias a la vez sobre
-              // el mismo medidor.
-              setUnlinked(null);
-              fetchMeters();
-            }}
-          />
-        </div>
-      )}
+          {group.name&&group.meters.length===1&&group.meters[0].role==='central'&&
+            <p className="mt-4 text-sm text-muted"><b>¿Querés conocer qué consume cada sector?</b> Agregá un medidor de circuito para ver el consumo de un sector.</p>}
+        </section>)}
+      </div>
 
       <UnlinkMeterDialog
         open={unlinking !== null}
@@ -224,103 +291,81 @@ export function MetersView() {
   );
 }
 
-function MeterCard({ meter, onUnlink }: { meter: MeterSummary; onUnlink: () => void }) {
-  const goalLabel = goalSummary(meter.goal);
-
-  return (
-    <article className="flex flex-col rounded-2xl border border-border-soft bg-surface p-5">
-      <header className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h2 className="text-base font-bold tracking-tight">{meter.name}</h2>
-          {/* Qué mide este medidor. Es una etiqueta suya y nada más: las
-              tarjetas no se suman ni se comparan entre sí. */}
-          <p className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">
-              {meter.role === 'central' ? (
-                <Zap className="h-3 w-3" />
-              ) : (
-                <MapPin className="h-3 w-3" />
-              )}
-              {meter.role === 'central' ? 'Mide todo el consumo del lugar' : meter.areaLabel || ROLE_LABEL.area}
-            </span>
-            {meter.phases === 3 && (
-              <span className="inline-flex items-center rounded-full border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted">
-                {PHASE_LABEL[3]}
-              </span>
-            )}
-          </p>
-          <p className="text-xs text-muted mt-1">
-            {meter.latest
-              ? `Última medición ${formatRelativeMinutes(meter.latest.recordedAt)}`
-              : 'Sin mediciones todavía'}
-          </p>
+function MeterCard({meter,supply,hardware,onUnlink,onGroup,children}:{
+  meter:MeterSummary;supply:string;hardware?:DeviceKind;onUnlink:()=>void;onGroup:()=>void;children:React.ReactNode;
+}) {
+  const kind=meter.role==='central'?'general':'circuit';
+  const [connection,setConnection]=useState<{online:boolean|null;checkedAt:string}|null>(null);
+  const [checking,setChecking]=useState(false);
+  const [connectionError,setConnectionError]=useState('');
+  async function checkConnection() {
+    setChecking(true);setConnectionError('');
+    try{
+      const response=await fetch(meterHref('/api/meter/connection',meter.deviceId),{cache:'no-store'});
+      const payload=await response.json();
+      if(!response.ok)throw new Error(payload.error);
+      setConnection({online:typeof payload.online==='boolean'?payload.online:null,checkedAt:new Date().toISOString()});
+    }catch{setConnection(null);setConnectionError('No pudimos comprobar la conexión con Tuya.');}
+    finally{setChecking(false);}
+  }
+  const offline=connection?.online===false&&(!meter.latest||Date.parse(meter.latest.recordedAt)<=Date.parse(connection.checkedAt));
+  const status=offline?{label:'Sin conexión al consultar',tone:'warn'} as const
+    :readingStatus(meter.latest,meter.collectionIntervalMinutes,meter.syncError);
+  const tone={danger:'text-danger',warn:'text-warn',ok:'text-ok',muted:'text-muted'}[status.tone];
+  const goal=goalSummary(meter.goal);
+  const details=useRef<HTMLDetailsElement>(null);
+  const settings=meterHref('/ajustes/dispositivos',meter.deviceId);
+  const action='block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent';
+  return <article className="flex min-w-0 flex-col rounded-2xl border border-border-soft bg-surface p-4">
+    <div className="relative flex min-h-24 items-center justify-center rounded-xl bg-surface-raised">
+      <DeviceArt kind={hardware??kind} className="h-24 w-40 max-w-full"/>
+      <details className="absolute right-2 top-2 z-10">
+        <summary className="grid size-9 cursor-pointer list-none place-items-center rounded-lg border border-border-soft bg-surface focus-visible:outline-2 focus-visible:outline-accent" aria-label={'Acciones de '+meter.name}>
+          <MoreHorizontal size={19} aria-hidden="true"/>
+        </summary>
+        <div className="absolute right-0 mt-1 w-48 rounded-xl border border-border-soft bg-surface p-1 shadow-lg">
+          {meter.isOwner&&<Link href={settings+'#nombre-dispositivo'} className={action}>Editar nombre</Link>}
+          <Link href={settings+'#ubicacion-dispositivo'} className={action}>Cambiar ubicación</Link>
+          <button type="button" onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');onGroup();}} className={action}>Cambiar suministro o tipo físico</button>
+          <button type="button" onClick={event=>{
+            event.currentTarget.closest('details')?.removeAttribute('open');
+            if(details.current){details.current.open=true;details.current.querySelector('summary')?.focus();}
+          }} className={action}>Ver detalles</button>
+          <Link href={settings} className={action}>Administrar configuración</Link>
+          {meter.isOwner&&<button type="button" onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');onUnlink();}} className={action+' text-danger'}>Desvincular</button>}
         </div>
-        <span className="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft">
-          <Gauge className="h-4 w-4 text-accent" />
-        </span>
-      </header>
-
-      <dl className="grid grid-cols-2 gap-3 mb-4">
-        <Stat
-          icon={<Zap className="h-3.5 w-3.5" />}
-          label="Tensión"
-          value={meter.latest ? `${formatNumber(meter.latest.voltage, 1)} V` : NO_DATA}
-        />
-        <Stat
-          icon={<Gauge className="h-3.5 w-3.5" />}
-          label="Potencia"
-          value={meter.latest ? `${formatNumber(meter.latest.powerW, 0)} W` : NO_DATA}
-        />
-      </dl>
-
-      <div className="space-y-2 mb-4">
-        <Row
-          icon={<Target className="h-3.5 w-3.5" />}
-          label="Objetivo"
-          value={goalLabel.text}
-          tone={goalLabel.tone}
-          tip="Cómo viene el consumo del mes contra la meta que fijaste. Se configura en la sección Objetivo."
-        />
-        <Row
-          icon={<TriangleAlert className="h-3.5 w-3.5" />}
-          label="Anomalías"
-          value={
-            meter.activeEvents === 0
-              ? 'Ninguna en curso'
-              : `${meter.activeEvents} en curso`
-          }
-          tone={meter.activeEvents === 0 ? 'ok' : 'danger'}
-          tip="Problemas detectados que siguen activos: tensión fuera de rango o falta de lecturas."
-        />
+      </details>
+    </div>
+    <div className="mt-3">
+      <p className="text-xs font-semibold text-accent">{deviceKinds[kind].label}</p>
+      <h3 className="mt-1 break-words text-base font-bold">{meter.name}</h3>
+      {hardware&&<p className="mt-1 text-xs text-muted">Equipo: {physicalKinds[hardware]}</p>}
+      <p className="mt-1 break-words text-xs text-muted">{[supply,meter.areaLabel||(meter.role==='central'?'Tablero general':'Sector sin indicar')].filter(Boolean).join(' · ')}</p>
+      <p className={'mt-3 flex items-center gap-2 text-xs font-semibold '+tone}><span aria-hidden="true" className="size-2 rounded-full bg-current"/>{status.label}</p>
+      {meter.latest&&<p className="mt-1 text-xs text-muted">Última lectura: {formatDateTime(meter.latest.recordedAt)}</p>}
+    </div>
+    {meter.latest&&(meter.latest.voltage!=null||meter.latest.powerW!=null)&&<dl className="mt-3 grid grid-cols-2 gap-2">
+      {meter.latest.voltage!=null&&<Stat icon={<Zap size={13}/>} label="Tensión" value={formatNumber(meter.latest.voltage,1)+' V'}/>}
+      {meter.latest.powerW!=null&&<Stat icon={<Gauge size={13}/>} label="Potencia" value={formatNumber(meter.latest.powerW,0)+' W'}/>}
+    </dl>}
+    {children}
+    <details ref={details} className="mb-4 mt-3 text-sm">
+      <summary className="cursor-pointer text-muted focus-visible:outline-2 focus-visible:outline-accent">Ver detalles</summary>
+      <p className="mt-2 text-xs text-muted">Función: {deviceKinds[kind].label} · {PHASE_LABEL[meter.phases]}. {deviceKinds[kind].description}</p>
+      <button type="button" onClick={()=>void checkConnection()} disabled={checking} className="mt-2 text-xs font-semibold text-accent underline disabled:opacity-50">
+        {checking?'Consultando conexión…':'Comprobar conexión con Tuya'}
+      </button>
+      <p role="status" className="mt-1 text-xs text-muted">{connectionError||
+        (connection?(connection.online===null?'Tuya no informó el estado':connection.online?'En línea al consultar':'Sin conexión al consultar')+' · '+formatDateTime(connection.checkedAt):'')}</p>
+      <div className="my-3 space-y-2">
+        <Row icon={<Target size={14}/>} label="Objetivo" value={goal.text} tone={goal.tone} tip="Avance frente al objetivo del mes."/>
+        <Row icon={<TriangleAlert size={14}/>} label="Anomalías" value={meter.activeEvents===0?'Ninguna en curso':meter.activeEvents+' en curso'}
+          tone={meter.activeEvents===0?'ok':'danger'} tip="Alertas que siguen activas para este dispositivo."/>
       </div>
-
-      <HomeStatus home={meter.home} deviceId={meter.deviceId} />
-
-      {/* Los enlaces llevan el medidor de esta tarjeta: sin eso, con más de
-          uno vinculado, "Ir a mi medidor" abriría siempre el primero. */}
-      <Link
-        href={meterHref('/dashboard', meter.deviceId)}
-        className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/85"
-      >
-        Ir a mi medidor
-        <ArrowRight className="h-4 w-4" />
-      </Link>
-
-      {/* Solo para quien vinculó el medidor: una cuenta invitada no puede
-          desvincularlo y el botón terminaría en un 403. Va discreto y al
-          final: es la acción menos frecuente y la más difícil de deshacer. */}
-      {meter.isOwner && (
-        <button
-          type="button"
-          onClick={onUnlink}
-          className="mt-2 inline-flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-danger"
-        >
-          <Link2Off className="h-3.5 w-3.5" />
-          Desvincular de mi cuenta
-        </button>
-      )}
-    </article>
-  );
+      <HomeStatus home={meter.home} deviceId={meter.deviceId}/>
+    </details>
+    <Link href={meterHref('/dashboard',meter.deviceId)} className={primary+' mt-auto'}>Ver monitor <ArrowRight size={16} aria-hidden="true"/></Link>
+  </article>;
 }
 
 /**

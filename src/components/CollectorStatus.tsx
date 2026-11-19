@@ -33,7 +33,7 @@ export function CollectorStatus() {
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
+      className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-medium ${
         status.active ? 'border-ok/40 bg-ok/10 text-ok' : 'border-warn/40 bg-warn/10 text-warn'
       }`}
     >

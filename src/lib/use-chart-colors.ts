@@ -9,19 +9,21 @@ export type ChartColors = {
   tooltipBg: string;
   power: string;
   voltage: string;
+  reference: string;
   ok: string;
   warn: string;
   danger: string;
 };
 
-/** Paleta del tema claro. Es también la respuesta del render de servidor. */
+/** Paleta del tema claro (EnergIA Sur). Es también la respuesta del render de servidor. */
 const INITIAL: ChartColors = {
-  grid: '#dbe3ec',
-  axis: '#5b6b7d',
+  grid: '#d4e3eb',
+  axis: '#455c7c',
   tooltipBg: '#ffffff',
-  power: '#1e6fd9',
-  voltage: '#15803d',
-  ok: '#15803d',
+  power: '#001b52',
+  voltage: '#00a59d',
+  reference: '#455c7c',
+  ok: '#00a59d',
   warn: '#b45309',
   danger: '#c0392b',
 };
@@ -57,6 +59,7 @@ function getSnapshot(): ChartColors {
     tooltipBg: read('--chart-tooltip-bg', INITIAL.tooltipBg),
     power: read('--chart-power', INITIAL.power),
     voltage: read('--chart-voltage', INITIAL.voltage),
+    reference: read('--chart-reference', INITIAL.reference),
     // Los semánticos se leen de la paleta general: son los mismos que usa la
     // interfaz para advertencias y errores, y deben coincidir.
     ok: read('--ok', INITIAL.ok),
@@ -64,7 +67,7 @@ function getSnapshot(): ChartColors {
     danger: read('--danger', INITIAL.danger),
   };
 
-  const key = `${next.grid}|${next.axis}|${next.tooltipBg}|${next.power}|${next.voltage}|${next.ok}|${next.warn}|${next.danger}`;
+  const key = `${next.grid}|${next.axis}|${next.tooltipBg}|${next.power}|${next.voltage}|${next.reference}|${next.ok}|${next.warn}|${next.danger}`;
   if (key !== cachedKey) {
     cachedKey = key;
     cached = next;

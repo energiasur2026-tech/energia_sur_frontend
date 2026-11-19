@@ -22,7 +22,7 @@ import dynamic from 'next/dynamic';
  * cosas más molestas que puede hacer una página mientras carga.
  */
 
-function Placeholder({ height }: { height: number }) {
+function Placeholder({ height }: { height: number | string }) {
   return (
     <div
       style={{ height }}
@@ -34,7 +34,7 @@ function Placeholder({ height }: { height: number }) {
 
 export const HistoryChart = dynamic(
   () => import('./HistoryChart').then((mod) => mod.HistoryChart),
-  { ssr: false, loading: () => <Placeholder height={256} /> }
+  { ssr: false, loading: () => <Placeholder height="100%" /> }
 );
 
 export const EventChart = dynamic(() => import('./EventChart').then((mod) => mod.EventChart), {

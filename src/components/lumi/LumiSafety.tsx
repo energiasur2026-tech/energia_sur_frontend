@@ -26,18 +26,12 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
   const [opened, setOpened] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [selected, setSelected] = useState<string>(SAFETY_TIPS[0].id);
-  const [zoom, setZoom] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [pan, setPan] = useState(50);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
-  const expandButton = useRef<HTMLButtonElement>(null);
-  const backButton = useRef<HTMLButtonElement>(null);
   const preferences = useRef<HTMLElement>(null);
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previousZoom = useRef(false);
   const [failed, setFailed] = useState<string[]>([]);
   const [storageError, setStorageError] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -48,10 +42,10 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
     opener.current = document.activeElement as HTMLElement | null;
     onOpenChange?.(true);
     if (tipId) setSelected(tipId);
-    setZoom(false); setZoomLevel(1); setPan(50); setPreferencesOpen(false);
+    setPreferencesOpen(false);
     setNotice(null); setOpened(true);
   }, [onOpenChange]);
-  function closeViewer() { setOpened(false); setZoom(false); onOpenChange?.(false); }
+  function closeViewer() { setOpened(false); onOpenChange?.(false); }
 
   useEffect(() => {
     unavailable.current = blocked || opened || storageError || critical || /ajustes|medidores|config|login|setup|onboarding|registro/.test(pathname);
@@ -129,10 +123,7 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
 
   useEffect(() => {
     if (content.current) content.current.scrollTop = 0;
-    if (zoom) backButton.current?.focus({ preventScroll: true });
-    else if (previousZoom.current) expandButton.current?.focus({ preventScroll: true });
-    previousZoom.current = zoom;
-  }, [selected, zoom]);
+  }, [selected]);
 
   useEffect(() => {
     if (preferencesOpen && content.current) content.current.scrollTop = content.current.scrollHeight;
@@ -154,7 +145,7 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       return;
     }
-    if (zoom || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || (event.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"], [role="slider"]')) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || (event.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"], [role="slider"]')) return;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1);
     }
@@ -173,8 +164,8 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
       <small>💡 Consejo preventivo</small><p>{notice.message}</p>
       <button type="button" onClick={() => openViewer(notice.id)}>Ver consejo</button>
     </aside>}
-    {opened && createPortal(<dialog ref={dialog} className={styles.dialog} data-image-mode={zoom || undefined} aria-labelledby="safety-title" aria-describedby="safety-subtitle" onKeyDown={keyboard}
-      onCancel={event => { event.preventDefault(); if (zoom) setZoom(false); else closeViewer(); }}>
+    {opened && createPortal(<dialog ref={dialog} className={styles.dialog} aria-labelledby="safety-title" aria-describedby="safety-subtitle" onKeyDown={keyboard}
+      onCancel={event => { event.preventDefault(); closeViewer(); }}>
       <header className={styles.header}>
         <div className={styles.heading}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -186,53 +177,35 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
         </div>
         <button ref={closeButton} type="button" className={styles.close} onClick={closeViewer} aria-label="Cerrar consejos de seguridad">Cerrar <span aria-hidden="true">×</span></button>
       </header>
-      <div ref={content} className={styles.body} tabIndex={zoom ? 0 : undefined} aria-label={zoom ? 'Imagen ampliada, desplazamiento vertical' : undefined}>
+      <div ref={content} className={styles.body}>
         <article className={styles.tip} aria-label={tip.title}>
           {failed.includes(tip.id) ? (
             <p className={styles.imageError} role="status">La imagen no está disponible. Podés leer la recomendación a continuación.</p>
           ) : (
             <figure className={styles.artwork}>
               <div className={styles.imageStage}>
-                {!zoom && (
-                  <button
-                    ref={expandButton}
-                    type="button"
-                    className={styles.expandButton}
-                    onClick={() => {
-                      setZoomLevel(1);
-                      setPan(50);
-                      setZoom(true);
-                    }}
-                  >
-                    Ampliar imagen <span aria-hidden="true">↗</span>
-                  </button>
-                )}
                 {/* The original image and logos are never cropped or rewritten. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  className={zoom ? styles.zoomImage : styles.tipImage}
-                  style={zoom ? { width: `${zoomLevel * 100}%`, marginLeft: `${-(zoomLevel - 1) * pan}%` } : undefined}
+                  className={styles.tipImage}
                   src={'/assets/lumi/safety/' + tip.image}
                   alt={tip.alt}
                   loading="lazy"
-                  width="1122"
-                  height="1402"
+                  width="1254"
+                  height="1254"
                   onError={() => {
                     setFailed(current => [...current, tip.id]);
-                    setZoom(false);
                   }}
                 />
               </div>
             </figure>
           )}
-          {!zoom && (
-            <div className={styles.explanation}>
-              <p>{tip.explanation}</p>
-              <small>Recomendación general de prevención</small>
-            </div>
-          )}
+          <div className={styles.explanation}>
+            <p>{tip.explanation}</p>
+            <small>Recomendación general de prevención</small>
+          </div>
         </article>
-        {!zoom && preferencesOpen && (
+        {preferencesOpen && (
           <section ref={preferences} id="safety-preferences" className={styles.preferences} aria-label="Preferencias de consejos">
             <label>
               <input type="checkbox" checked={enabled} onChange={event => toggle(event.target.checked)} />
@@ -247,24 +220,12 @@ export function LumiSafety({ userId, blocked, onOpenChange }: { userId: string; 
         )}
       </div>
       <footer className={styles.footer}>
-        {zoom ? <>
-          <div className={styles.zoomControls} role="group" aria-label="Controles de imagen ampliada">
-            <button ref={backButton} type="button" onClick={() => setZoom(false)}>← Volver al consejo</button>
-            <div className={styles.scaleControls}>
-              <button type="button" aria-label="Reducir zoom" disabled={zoomLevel <= 1} onClick={() => setZoomLevel(value => Math.max(1, value - .5))}>−</button>
-              <output aria-label="Nivel de zoom">{zoomLevel}×</output>
-              <button type="button" aria-label="Aumentar zoom" disabled={zoomLevel >= 3} onClick={() => setZoomLevel(value => Math.min(3, value + .5))}>+</button>
-            </div>
-          </div>
-          {zoomLevel > 1 && <label className={styles.panControl}>Desplazar imagen<input type="range" min="0" max="100" value={pan} onChange={event => setPan(Number(event.target.value))} aria-label="Desplazamiento horizontal de la imagen" /></label>}
-        </> : <>
           <nav className={styles.pager} aria-label="Recorrer consejos">
             <button type="button" disabled={index === 0} onClick={() => move(-1)}>← Anterior</button>
             <span role="status" aria-live="polite" aria-atomic="true">Consejo {index + 1} de {SAFETY_TIPS.length}</span>
             <button type="button" disabled={index === SAFETY_TIPS.length - 1} onClick={() => move(1)}>Siguiente →</button>
           </nav>
           <button type="button" className={styles.configure} aria-expanded={preferencesOpen} aria-controls="safety-preferences" onClick={() => setPreferencesOpen(value => !value)}>Configurar frecuencia <span aria-hidden="true">{preferencesOpen ? '⌃' : '⌄'}</span></button>
-        </>}
       </footer>
     </dialog>, document.body)}
   </>;

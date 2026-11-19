@@ -39,11 +39,8 @@ export function MetricCard({
   const hasValue = value !== NO_DATA;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-border-soft bg-surface p-4 md:p-5">
-      {/* Alto fijo de dos líneas: sin esto, una etiqueta que envuelve empuja
-          su valor hacia abajo y queda desalineado respecto de las tarjetas
-          vecinas de la misma fila. */}
-      <header className="flex items-start gap-1.5 mb-3 min-h-[2.1rem]">
+    <article className="flex min-w-0 flex-col justify-between gap-1 rounded-2xl border border-border-soft bg-surface px-4 py-3 lg:min-h-28">
+      <header className="flex items-center gap-2">
         <span className={`${TONE_CLASS[tone]} shrink-0 mt-px`}>{icon}</span>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted leading-snug">
           {label}
@@ -53,17 +50,17 @@ export function MetricCard({
         {tip && <InfoTooltip text={tip} title={label} />}
       </header>
 
-      <p className="flex items-baseline gap-1.5">
+      <p className="flex flex-wrap items-baseline gap-x-1.5">
         <ValueFade
           value={value}
-          className={`text-2xl md:text-3xl font-bold tabular-nums tracking-tight ${
+          className={`text-3xl font-bold tabular-nums tracking-tight ${
             hasValue ? '' : 'text-muted'
           }`}
         />
         {hasValue && unit && <span className="text-sm font-medium text-muted">{unit}</span>}
       </p>
 
-      <p className="mt-1 min-h-4 text-xs text-muted">
+      <p className="min-h-4 text-xs text-muted">
         <ValueFade value={hint ?? ''} />
       </p>
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { SettingsView } from '@/components/SettingsView';
+import { SettingsHub } from '@/components/SettingsHub';
 
 export const metadata: Metadata = {
   title: 'Ajustes',
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AjustesPage() {
-  return <SettingsView />;
+  return <SettingsHub />;
 }

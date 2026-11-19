@@ -1,9 +1,10 @@
 'use client';
 
-import { Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { applyTheme, type Theme } from '@/lib/theme';
-import { useTheme } from '@/lib/use-theme';
+import { useTheme, useThemePreference } from '@/lib/use-theme';
 import { SwitchToggle } from './SwitchToggle';
+import { useNavigationPreferences } from './NavigationPreferences';
 
 const OPTIONS = [
   { value: 'light' as Theme, label: 'Claro', icon: <Sun className="h-3.5 w-3.5" /> },
@@ -25,15 +26,23 @@ const OPTIONS = [
  */
 export function ThemeToggle({ variant = 'compact' }: { variant?: 'compact' | 'full' }) {
   const theme = useTheme();
+  const preference = useThemePreference();
+  const { save } = useNavigationPreferences();
+  function select(value:Theme|'system') {
+    applyTheme(value);
+    save({theme:value});
+  }
 
   if (variant === 'full') {
     return (
-      <SwitchToggle
-        options={OPTIONS}
-        value={theme}
-        onChange={applyTheme}
-        label="Tema de la aplicación"
-      />
+      <fieldset className="flex flex-wrap gap-2">
+        <legend className="sr-only">Tema de la aplicación</legend>
+        {([...OPTIONS,{value:'system',label:'Automático',icon:<Monitor className="h-3.5 w-3.5"/>}] as const).map(option=><label
+          key={option.value} className={'inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm focus-within:outline-2 focus-within:outline-accent '+(preference===option.value?'border-accent bg-accent-soft':'border-border-soft')}>
+          <input type="radio" name="appearance-theme" className="accent-accent" checked={preference===option.value} onChange={()=>select(option.value)}/>
+          <span aria-hidden="true">{option.icon}</span>{option.label}
+        </label>)}
+      </fieldset>
     );
   }
 
@@ -42,7 +51,7 @@ export function ThemeToggle({ variant = 'compact' }: { variant?: 'compact' | 'fu
       <SwitchToggle
         options={OPTIONS_ICON_ONLY}
         value={theme}
-        onChange={applyTheme}
+        onChange={select}
         label="Tema de la aplicación"
         size="sm"
       />

@@ -1,19 +1,21 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Activity, Eye, EyeOff, Gauge, Plug, RefreshCw, Target, TriangleAlert, Zap } from 'lucide-react';
+import { Activity, Eye, EyeOff, Gauge, Plug, RefreshCw, Zap } from 'lucide-react';
 import { ActionCard } from './ActionCard';
 import { ActiveEventsBanner } from './ActiveEventsBanner';
 import { CollectorStatus } from './CollectorStatus';
 import { HistoryChart } from './LazyCharts';
+import { MonitorPeriodCards, type MonitorPeriod } from './MonitorPeriodCards';
 import { MetricCard } from './MetricCard';
+import { useSelectedMeterName } from './SelectedMeterName';
 import { SetupNotice } from './SetupNotice';
-import { formatClock, formatDateTime, formatNumber, NO_DATA } from '@/lib/format';
+import { toEventBands } from '@/lib/chart-markers';
+import { formatDateTime, formatNumber, NO_DATA } from '@/lib/format';
 import { DEFAULT_RANGE, RANGES, RANGE_KEYS, type RangeKey } from '@/lib/ranges';
-import { apiUrl, meterHref, useMeterId } from '@/lib/use-meter-id';
+import { apiUrl, useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
 import type { EventRecord } from '@/lib/event-types';
-import type { GoalProgress } from '@/lib/goal';
 import type { Recommendation } from '@/lib/recommendations';
 import type { MeterThresholds } from '@/lib/threshold-types';
 import type { ApiErrorPayload, HistoryPayload, LiveReading } from '@/lib/types';
@@ -26,7 +28,6 @@ const HISTORY_INTERVAL_MS = 60000;
 const CONTEXT_INTERVAL_MS = 60000;
 
 type Context = {
-  goal: GoalProgress | null;
   recommendations: Recommendation[];
   events: EventRecord[];
   thresholds: MeterThresholds | null;
@@ -34,7 +35,14 @@ type Context = {
 
 export function Dashboard() {
   // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
-  const deviceId = useMeterId();
+  const deviceId=useMeterId();
+  return <MeterDashboard key={deviceId??'default'} deviceId={deviceId}/>;
+}
+
+function MeterDashboard({deviceId}:{deviceId:string|null}) {
+  const meterName = useSelectedMeterName(deviceId);
+  const [period,setPeriod]=useState<MonitorPeriod|null>(null);
+  const [periodFailed,setPeriodFailed]=useState(false);
   const [live, setLive] = useState<LiveReading | null>(null);
   const [history, setHistory] = useState<HistoryPayload | null>(null);
   const [range, setRange] = useState<RangeKey>(DEFAULT_RANGE);
@@ -42,7 +50,6 @@ export function Dashboard() {
   const [error, setError] = useState<ApiErrorPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<Context>({
-    goal: null,
     recommendations: [],
     events: [],
     thresholds: null,
@@ -51,6 +58,7 @@ export function Dashboard() {
 
   // Evita que una respuesta lenta de un rango anterior pise a la del rango actual.
   const lastHistoryRequest = useRef(0);
+  const lastPeriodRequest = useRef(0);
 
   const fetchLive = useCallback(async () => {
     try {
@@ -89,31 +97,61 @@ export function Dashboard() {
   }, [deviceId]);
 
   /**
-   * Objetivo, eventos y umbrales alimentan los KPIs nuevos y las marcas del
-   * gráfico. Se piden juntos y su falla no interrumpe la lectura en vivo.
+   * Recomendaciones, eventos y umbrales alimentan las alertas y las marcas del
+   * gráfico. Se consultan en paralelo pero de forma desacoplada para que un
+   * error en Proyección no oculte los umbrales ni eventos del Monitor.
    */
   const fetchContext = useCallback(async () => {
-    try {
-      const [forecastResponse, eventsResponse] = await Promise.all([
-        fetch(apiUrl('/api/meter/forecast', deviceId), { cache: 'no-store' }),
-        fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' }),
-      ]);
+    const [forecastResult, eventsResult] = await Promise.allSettled([
+      fetch(apiUrl('/api/meter/forecast?period=billing', deviceId), { cache: 'no-store' }),
+      fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' }),
+    ]);
 
-      if (!forecastResponse.ok || !eventsResponse.ok) return;
+    let nextRecommendations: Recommendation[] | null = null;
+    if (forecastResult.status === 'fulfilled' && forecastResult.value.ok) {
+      try {
+        const forecast = await forecastResult.value.json();
+        nextRecommendations = forecast.recommendations ?? [];
+      } catch {
+        // Complementario
+      }
+    }
 
-      const forecast = await forecastResponse.json();
-      const events = await eventsResponse.json();
+    let nextEvents: EventRecord[] | null = null;
+    let nextThresholds: MeterThresholds | null | undefined = undefined;
+    if (eventsResult.status === 'fulfilled' && eventsResult.value.ok) {
+      try {
+        const events = await eventsResult.value.json();
+        nextEvents = events.events ?? [];
+        nextThresholds = events.thresholds ?? null;
+      } catch {
+        // Complementario
+      }
+    }
 
-      setContext({
-        goal: forecast.goal ?? null,
-        recommendations: forecast.recommendations ?? [],
-        events: events.events ?? [],
-        thresholds: events.thresholds ?? null,
-      });
-    } catch {
-      // Complementario: el Monitor sigue funcionando sin este contexto.
+    if (nextRecommendations !== null || nextEvents !== null || nextThresholds !== undefined) {
+      setContext((prev) => ({
+        recommendations: nextRecommendations ?? prev.recommendations,
+        events: nextEvents ?? prev.events,
+        thresholds: nextThresholds !== undefined ? nextThresholds : prev.thresholds,
+      }));
     }
   }, [deviceId]);
+
+  const fetchPeriod=useCallback(async()=>{
+    const requestId=++lastPeriodRequest.current;
+    try {
+      const response=await fetch(apiUrl('/api/meter/monitor-period',deviceId),{cache:'no-store'});
+      if(!response.ok)throw new Error();
+      const payload=await response.json() as MonitorPeriod;
+      if(requestId!==lastPeriodRequest.current)return;
+      setPeriod(payload);setPeriodFailed(false);
+    }catch{
+      if(requestId!==lastPeriodRequest.current)return;
+      setPeriod(null);setPeriodFailed(true);
+    }
+  },[deviceId]);
+  usePolling(fetchPeriod, CONTEXT_INTERVAL_MS);
 
   const pollHistory = useCallback(() => fetchHistory(range), [fetchHistory, range]);
 
@@ -126,27 +164,34 @@ export function Dashboard() {
   }
 
   const summary = history?.summary;
-  const activeEvents = context.events.filter((event) => event.endedAt === null);
+  const series = history?.series ?? [];
+  const averagePowerW = summary?.avgPowerW ?? null;
+  const hasVisibleEvents =
+    series.length > 0 &&
+    toEventBands(
+      context.events,
+      new Date(series[0].bucket).getTime(),
+      new Date(series[series.length - 1].bucket).getTime()
+    ).length > 0;
 
-  /**
-   * Potencia media equivalente al objetivo: si el consumo se mantuviera parejo
-   * todo el mes, este sería el nivel. Sirve como línea de referencia en el
-   * gráfico de potencia — comparar contra ella dice, de un vistazo, si el
-   * ritmo actual alcanza para cumplir la meta.
-   */
-  const goalPowerW =
-    context.goal?.allowedPerDayKwh != null
-      ? (context.goal.allowedPerDayKwh * 1000) / 24
-      : null;
+  const voltageTip = context.thresholds
+    ? `Tensión medida en vivo por el medidor y promedio del rango ${range}. Tus umbrales de alerta configurados son ${formatNumber(context.thresholds.lowVoltageV, 1)} V a ${formatNumber(context.thresholds.highVoltageV, 1)} V.`
+    : `Tensión medida en vivo por el medidor y promedio del rango ${range}. Podés configurar los umbrales de alerta en Ajustes.`;
+  const currentTip = context.thresholds
+    ? `Corriente instantánea que circula por la instalación y máxima registrada en el rango ${range}. Se alerta sobrecorriente por encima de ${formatNumber(context.thresholds.overcurrentA, 1)} A.`
+    : `Corriente instantánea que circula por la instalación y máxima registrada en el rango ${range}.`;
+  const powerTip = `Potencia activa instantánea medida ahora (en W) y pico observado en el rango ${range}. Un pico puntual al encender un equipo no se clasifica automáticamente como anomalía.`;
+  const energyTip =
+    'Registro histórico acumulado del medidor desde su instalación (en kWh). No es el consumo del mes ni del período actual: el consumo y gasto del período se calculan por diferencia entre lecturas en "Gasto del período".';
 
   return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto">
-      <Header live={live} loading={loading} onRefresh={fetchLive} />
+    <div className="meter-monitor flex-1 min-w-0 w-full mx-auto">
+      <Header name={meterName} live={live} loading={loading} failed={Boolean(error)} onRefresh={fetchLive} />
 
       <ActiveEventsBanner />
 
       {error && (
-        <p className="mb-6 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <p className="mb-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error.error}
         </p>
       )}
@@ -154,76 +199,50 @@ export function Dashboard() {
       {/* `skipped` es lo normal: significa que todavía no toca guardar según
           el intervalo configurado. Solo `failed` es un problema real. */}
       {live?.persisted === 'failed' && (
-        <p className="mb-6 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn">
+        <p className="mb-3 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
           Lectura en vivo disponible, pero no se pudo guardar en la base. El histórico no avanza.
         </p>
       )}
 
-      <ActionCard recommendations={context.recommendations} />
-
-      {/* Los tooltips explican QUÉ ES cada magnitud, no qué número muestra:
-          quien no sabe de electricidad necesita lo primero, no lo segundo. */}
-      <section className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 mb-6 md:mb-8">
+      <section className="monitor-section grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicadores eléctricos">
         <MetricCard
           label="Tensión"
           value={formatNumber(live?.voltage, 1)}
           unit="V"
           icon={<Zap className="h-4 w-4" />}
-          hint={summary?.avgVoltage ? `Promedio ${formatNumber(summary.avgVoltage, 1)} V` : ''}
-          tip="Es la 'fuerza' con la que llega la electricidad a tu casa, medida en voltios. Acá debería rondar los 220 V. Si baja mucho, los motores (heladera, bomba) sufren; si sube mucho, se pueden dañar los aparatos electrónicos."
+          hint={summary?.avgVoltage != null ? `Promedio ${formatNumber(summary.avgVoltage, 1)} V` : ''}
+          tip={voltageTip}
         />
         <MetricCard
           label="Corriente"
           value={formatNumber(live?.current, 3)}
           unit="A"
           icon={<Activity className="h-4 w-4" />}
-          hint={summary?.maxCurrent ? `Máxima ${formatNumber(summary.maxCurrent, 3)} A` : ''}
-          tip="Es cuánta electricidad está pasando en este momento por la instalación, medida en amperes. Sube cuando prendés algo y baja cuando lo apagás. Si sube demasiado, salta la térmica."
+          hint={summary?.maxCurrent != null ? `Máxima ${formatNumber(summary.maxCurrent, 3)} A` : ''}
+          tip={currentTip}
         />
         <MetricCard
           label="Potencia"
           value={formatNumber(live?.powerW, 0)}
           unit="W"
           icon={<Gauge className="h-4 w-4" />}
-          hint={summary?.maxPowerW ? `Pico ${formatNumber(summary.maxPowerW, 0)} W` : ''}
+          hint={summary?.maxPowerW != null ? `Pico ${formatNumber(summary.maxPowerW, 0)} W` : ''}
           tone="ok"
-          tip="Es cuánta electricidad estás usando ahora mismo, medida en watts. Una lámpara LED son unos 10 W; una pava eléctrica, unos 2000 W. Es el número que más se mueve durante el día."
+          tip={powerTip}
         />
         <MetricCard
           label="Energía acumulada"
           value={formatNumber(live?.totalEnergyKwh, 2)}
           unit="kWh"
           icon={<Plug className="h-4 w-4" />}
-          hint="Total del medidor"
-          tip="Es el total que lleva contado el medidor desde que se instaló, en kilowatt-hora. Es el mismo número que mira la empresa de luz: la diferencia entre dos fechas es lo que consumiste en el medio, y es lo que te facturan."
-        />
-        <MetricCard
-          label="Objetivo"
-          value={goalValue(context.goal)}
-          unit=""
-          icon={<Target className="h-4 w-4" />}
-          hint={goalHint(context.goal)}
-          tone={goalTone(context.goal)}
-          tip="Es la meta de consumo que vos elegís para el mes. La app la usa para avisarte si vas bien o si te estás pasando, con tiempo para corregir antes de que llegue la factura."
-          action={{
-            label: context.goal?.goalKwh ? 'Ver mi objetivo' : 'Configurar objetivo',
-            href: meterHref('/proyeccion', deviceId),
-          }}
-        />
-        <MetricCard
-          label="Anomalías"
-          value={String(activeEvents.length)}
-          unit=""
-          icon={<TriangleAlert className="h-4 w-4" />}
-          hint={activeEvents.length > 0 ? 'en curso ahora' : `${context.events.length} en el historial`}
-          tone={activeEvents.length > 0 ? 'danger' : 'ok'}
-          tip="Son problemas detectados en tu instalación: que la tensión se haya ido por debajo o por encima de lo normal, o que el medidor haya dejado de reportar. Cada uno queda registrado con su horario y duración."
-          action={{ label: 'Ver eventos', href: meterHref('/eventos', deviceId) }}
+          hint="Total histórico del medidor"
+          tip={energyTip}
         />
       </section>
+      <MonitorPeriodCards data={period} failed={periodFailed} deviceId={deviceId}/>
 
-      <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 lg:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+      <section aria-label="Historial de mediciones" className="rounded-2xl border border-border-soft bg-surface p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div className="flex gap-1 rounded-xl bg-surface-raised p-1">
             <Toggle active={metric === 'voltage'} onClick={() => setMetric('voltage')}>
               Tensión
@@ -260,21 +279,28 @@ export function Dashboard() {
           </div>
         </div>
 
-        <HistoryChart
-          series={history?.series ?? []}
-          bucketSeconds={history?.bucketSeconds ?? 900}
-          metric={metric}
-          thresholds={context.thresholds}
-          goalPowerW={goalPowerW}
-          events={context.events}
-          showReferences={showReferences}
-        />
+        <div className="monitor-chart">
+          <HistoryChart
+            series={series}
+            bucketSeconds={history?.bucketSeconds ?? 900}
+            metric={metric}
+            thresholds={context.thresholds}
+            averagePowerW={averagePowerW}
+            events={context.events}
+            showReferences={showReferences}
+          />
+        </div>
 
         {showReferences && (
-          <ChartLegend metric={metric} hasGoal={goalPowerW !== null} hasEvents={context.events.length > 0} />
+          <ChartLegend
+            metric={metric}
+            thresholds={context.thresholds}
+            averagePowerW={averagePowerW}
+            hasEvents={hasVisibleEvents}
+          />
         )}
 
-        <footer className="mt-5 pt-4 border-t border-border-soft flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted">
+        <footer className="mt-2 pt-2 border-t border-border-soft flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
           <span>{RANGES[range].label}</span>
           <span>
             {summary?.samples ? `${summary.samples.toLocaleString('es-AR')} lecturas` : 'Sin lecturas'}
@@ -286,45 +312,60 @@ export function Dashboard() {
           )}
         </footer>
       </section>
+      <div className="monitor-recommendations"><ActionCard recommendations={context.recommendations} deviceId={deviceId} /></div>
     </div>
   );
 }
 
-/** Explica qué significa cada marca del gráfico, en palabras simples. */
+/** Distingue visualmente valores medidos, umbrales de alerta, referencias estadísticas y anomalías. */
 function ChartLegend({
   metric,
-  hasGoal,
+  thresholds,
+  averagePowerW,
   hasEvents,
 }: {
   metric: 'power' | 'voltage';
-  hasGoal: boolean;
+  thresholds: MeterThresholds | null;
+  averagePowerW: number | null;
   hasEvents: boolean;
 }) {
-  const items: { color: string; label: string }[] = [];
+  const items: { swatch: React.ReactNode; label: string }[] = [
+    {
+      swatch: (
+        <span
+          className={`inline-block h-0.5 w-4 rounded-full ${
+            metric === 'voltage' ? 'bg-chart-voltage' : 'bg-chart-power'
+          }`}
+        />
+      ),
+      label: metric === 'voltage' ? 'Valores medidos (tensión)' : 'Valores medidos (potencia)',
+    },
+  ];
 
-  if (metric === 'voltage') {
+  if (metric === 'voltage' && thresholds) {
     items.push({
-      color: 'bg-danger',
-      label: 'Líneas cortadas: mínimo y máximo aceptables de tensión',
+      swatch: <span className="inline-block w-4 border-t-2 border-dashed border-danger" />,
+      label: `Umbrales de alerta configurados (${formatNumber(thresholds.lowVoltageV, 1)} V – ${formatNumber(thresholds.highVoltageV, 1)} V)`,
     });
-  } else if (hasGoal) {
+  } else if (metric === 'power' && averagePowerW !== null) {
     items.push({
-      color: 'bg-ok',
-      label: 'Línea cortada: el nivel parejo que cumple tu objetivo',
+      swatch: <span className="inline-block w-4 border-t-2 border-dotted border-chart-reference" />,
+      label: `Referencia estadística: promedio del rango (${Math.round(averagePowerW)} W)`,
     });
   }
 
   if (hasEvents) {
-    items.push({ color: 'bg-warn/40', label: 'Franjas sombreadas: momentos con anomalías' });
+    items.push({
+      swatch: <span className="inline-block h-2.5 w-3.5 rounded-sm border border-warn/50 bg-warn/25" />,
+      label: 'Franjas sombreadas: episodios de anomalía en el rango',
+    });
   }
 
-  if (items.length === 0) return null;
-
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-muted">
+    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
       {items.map((item) => (
         <li key={item.label} className="inline-flex items-center gap-1.5">
-          <span className={`h-2 w-3 rounded-sm ${item.color}`} />
+          {item.swatch}
           {item.label}
         </li>
       ))}
@@ -332,79 +373,53 @@ function ChartLegend({
   );
 }
 
-function goalValue(goal: GoalProgress | null): string {
-  if (!goal || goal.goalKwh === null) return NO_DATA;
-  return `${formatNumber(goal.dailyRateKwh ?? 0, 1)} / ${formatNumber(goal.allowedPerDayKwh, 1)}`;
-}
-
-function goalHint(goal: GoalProgress | null): string {
-  if (!goal || goal.goalKwh === null) return 'sin objetivo definido';
-  if (goal.status === 'no_data') return 'esperando lecturas del mes';
-  return 'kWh por día: usás / podés';
-}
-
-function goalTone(goal: GoalProgress | null): 'default' | 'ok' | 'warn' | 'danger' {
-  if (!goal || goal.goalKwh === null) return 'default';
-  if (goal.status === 'on_track') return 'ok';
-  if (goal.status === 'at_risk') return 'warn';
-  if (goal.status === 'over') return 'danger';
-  return 'default';
-}
-
 function Header({
-  live,
-  loading,
-  onRefresh,
+  name, live, loading, failed, onRefresh,
 }: {
+  name: string;
   live: LiveReading | null;
   loading: boolean;
+  failed: boolean;
   onRefresh: () => void;
 }) {
   return (
-    <header className="mb-5 md:mb-7">
-      {/* En celular el título y el botón comparten fila, y los indicadores
-          bajan a una tira propia: apilar todo en columna comía media pantalla
-          antes de mostrar un solo dato. */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Monitor del medidor</h1>
-          <p className="text-sm text-muted mt-0.5">
-            Última lectura {live ? formatClock(live.recordedAt) : NO_DATA}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onRefresh}
-          aria-label="Actualizar lectura"
-          className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-foreground"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Actualizar</span>
-        </button>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <StatusPill online={live?.online ?? false} known={live !== null} />
+    <header className="monitor-section grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5">
+      <h1 className="self-center break-words text-xl md:text-2xl font-bold tracking-tight">
+        {name ? `Monitor · ${name}` : 'Monitor del medidor'}
+      </h1>
+      <button
+        type="button"
+        onClick={onRefresh}
+        aria-label="Actualizar lectura"
+        className="inline-flex items-center gap-2 rounded-xl border border-border-soft bg-surface px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-foreground"
+      >
+        <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
+        <span className="hidden sm:inline">Actualizar</span>
+      </button>
+      <div className="col-span-full flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <p className="text-xs text-muted">
+          Última lectura {live ? formatDateTime(live.recordedAt) : NO_DATA}
+        </p>
+        <StatusPill online={live?.online ?? false} known={live !== null} failed={failed} />
         <CollectorStatus />
       </div>
     </header>
   );
 }
 
-function StatusPill({ online, known }: { online: boolean; known: boolean }) {
-  if (!known) {
+function StatusPill({ online, known, failed }: { online: boolean; known: boolean; failed: boolean }) {
+  if (failed || !known) {
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-border-soft px-3 py-1.5 text-xs font-medium text-muted">
         <span className="h-2 w-2 rounded-full bg-muted" />
-        Conectando
+        {failed ? 'Estado del medidor sin confirmar' : 'Conectando'}
       </span>
     );
   }
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
+      className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-medium ${
         online ? 'border-ok/40 bg-ok/10 text-ok' : 'border-danger/40 bg-danger/10 text-danger'
       }`}
     >
@@ -427,6 +442,7 @@ function Toggle({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
         active ? 'bg-accent text-white' : 'text-muted hover:text-foreground'
       }`}

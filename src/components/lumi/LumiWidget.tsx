@@ -4,6 +4,7 @@ import {useMeterId} from '@/lib/use-meter-id';
 import {CATEGORY_HELP_OPEN,type CategoryHelpRequest} from '@/lib/lumi-category-help';
 import {LumiCategoryHelp} from './LumiCategoryHelp';
 import { meterFetch } from '@/lib/meter-fetch';
+import { LUMI_OPEN_TAB } from '@/lib/lumi-open-tab';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -141,6 +142,16 @@ export function LumiWidget({ userId }: { userId: string }) {
   const refresh = useCallback(() => { void load(); }, [load]);
   usePolling(refresh, 120000);
 
+  useEffect(()=>{
+    const openTab=(event:Event)=>{
+      const requested=(event as CustomEvent<unknown>).detail;
+      if(requested!=='preferences'&&requested!=='events')return;
+      setCategoryHelp(null);setTab(requested);setClosing(false);setOpen(true);setIntro(false);setGreeting(false);
+    };
+    window.addEventListener(LUMI_OPEN_TAB,openTab);
+    return ()=>window.removeEventListener(LUMI_OPEN_TAB,openTab);
+  },[]);
+
   const closePanel = useCallback(() => {
     chatEpoch.current += 1;
     setFreshChat(true);
@@ -215,7 +226,9 @@ export function LumiWidget({ userId }: { userId: string }) {
       setFreshChat(false);
     }
     playSound('send');
-    if (await load({ action: 'chat', question: text })) setQuestion('');
+    if (await load({ action: 'chat', question: text }) && chatEpoch.current === epoch) {
+      setQuestion(current => current.trim() === text ? '' : current);
+    }
   }
 
   return <>
@@ -231,7 +244,7 @@ export function LumiWidget({ userId }: { userId: string }) {
         </span>
         {unread.length > 0 && <span className={styles.counter} aria-label={`${unread.length} elementos pendientes`}>{unread.length > 99 ? '99+' : unread.length}</span>}
       </button>
-      <span id="lumi-status" className="sr-only" role="status">{LUMI_LABELS[state]}{unread.length ? `. ${unread.length} avisos pendientes.` : ''}</span>
+      <span id="lumi-status" className="sr-only" role="status">{LUMI_LABELS[state]}{unread.length ? `. ${unread.length - pending.length} avisos sin leer y ${pending.length} consultas pendientes.` : ''}</span>
     </div>
     {open && createPortal(
       <dialog ref={dialog} id="lumi-panel" className={styles.panel} hidden={safetyOpen} aria-labelledby="lumi-title"

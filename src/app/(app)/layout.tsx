@@ -34,12 +34,12 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   return (
     // `pb-nav` reserva en mobile el alto de la barra inferior fija, para que
     // el final del contenido no quede tapado detrás de ella.
-    <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><NavigationPreferences userId={user.id}><div className="flex-1 flex flex-col pb-nav">
+    <Suspense fallback={null}><MeterContextBoundary key={user.id} userId={user.id}><NavigationPreferences userId={user.id} initial={user.navigation}><div className="flex-1 flex flex-col pb-nav">
       <AppNav userEmail={user.email} />
-      <div className="app-shell-content flex flex-1 flex-col">
+      <div className="app-shell-content flex min-w-0 flex-1 flex-col">
       <MeterGoneBanner />
       <SelectedMeterName/>
-      <div className="flex flex-1 flex-col pb-40">
+      <div className="app-page-frame flex flex-1 flex-col pb-40">
         <PageTransition>{children}</PageTransition>
       </div>
       {/* Va en el layout y no en una pantalla: aparece al entrar a la app, sea

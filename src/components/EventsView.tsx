@@ -94,10 +94,10 @@ export function EventsView() {
    * sumaría latencia sin traer nada nuevo.
    */
   const visible = useMemo(() => {
-    // Las fechas del formulario son locales; el fin se corre al final del día
-    // para que elegir el mismo día en ambos campos incluya esa jornada entera.
-    const fromMs = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
-    const toMs = toDate ? new Date(`${toDate}T23:59:59`).getTime() : null;
+    // Las fechas del formulario se interpretan en hora de Argentina (-03:00)
+    // para coincidir exactamente con los límites del período de facturación.
+    const fromMs = fromDate ? new Date(`${fromDate}T00:00:00-03:00`).getTime() : null;
+    const toMs = toDate ? new Date(`${toDate}T23:59:59.999-03:00`).getTime() : null;
 
     return events.filter((event) => {
       if (onlyActive && event.endedAt !== null) return false;

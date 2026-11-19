@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, ListChecks } from 'lucide-react';
 import type { Recommendation } from '@/lib/recommendations';
+import { meterHref } from '@/lib/use-meter-id';
 
 /**
  * Acciones sugeridas en el Monitor.
@@ -11,7 +12,13 @@ import type { Recommendation } from '@/lib/recommendations';
  * Monitor es una pantalla de un vistazo, y el detalle completo vive en
  * Proyección.
  */
-export function ActionCard({ recommendations }: { recommendations: Recommendation[] }) {
+export function ActionCard({
+  recommendations,
+  deviceId = null,
+}: {
+  recommendations: Recommendation[];
+  deviceId?: string | null;
+}) {
   const actionable = recommendations.filter((item) => item.tone === 'action').slice(0, 2);
   if (actionable.length === 0) return null;
 
@@ -36,7 +43,7 @@ export function ActionCard({ recommendations }: { recommendations: Recommendatio
       </ul>
 
       <Link
-        href="/proyeccion"
+        href={meterHref('/proyeccion?period=billing', deviceId)}
         className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
       >
         Ver el detalle y cómo hacerlo

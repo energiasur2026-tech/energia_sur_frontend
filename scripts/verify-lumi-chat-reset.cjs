@@ -6,7 +6,7 @@ const initial=()=>[{role:'user',text:'Consulta anterior sintética',at:'2026-11-
 async function meterFetch(url,options){const action=options?.body?JSON.parse(options.body):null;if(action)actions.push(action.action);if(action?.action==='clear'&&failClear)return {ok:false,status:503,json:async()=>({error:'No se pudo iniciar el chat nuevo'})};if(action?.action==='clear')messages=[];if(action?.action==='chat')messages=[{role:'user',text:action.question,at:'2026-11-14T11:00:00Z'},{role:'assistant',text:'Respuesta nueva sintética',at:'2026-11-14T11:00:01Z'}];return {ok:true,status:200,json:async()=>({version:'1',messages:[...messages],events:[],preferences:{reducedMotion:true,soundsEnabled:false}})}}
 const stubs={
  './LumiSafety':{LumiSafety:()=>null,OPEN_SAFETY:'lumi:open-safety'},
- '@/lib/use-meter-id':{useMeterId:()=>null},'@/lib/lumi-category-help':{CATEGORY_HELP_OPEN:'test-category'},'@/lib/meter-fetch':{meterFetch},
+ '@/lib/use-meter-id':{useMeterId:()=>null},'@/lib/lumi-open-tab':{LUMI_OPEN_TAB:'energia:lumi-open-tab'},'@/lib/lumi-category-help':{CATEGORY_HELP_OPEN:'test-category'},'@/lib/meter-fetch':{meterFetch},
  '@/lib/use-polling':{usePolling:callback=>React.useEffect(()=>{callback()},[callback])},
  './LumiAvatar':{LumiAvatar:()=>null},'./LumiHistory':{LumiHistory:({messages,error})=>React.createElement('div',null,messages.map((m,i)=>React.createElement('p',{key:i},m.text)),error?React.createElement('p',{role:'alert'},error):null)},
  './LumiEvents':{LumiEvents:()=>null},'./LumiCategoryHelp':{LumiCategoryHelp:()=>null},'./LumiResponseStyle':{LumiResponseStyle:()=>null},'./LumiMemory':{LumiMemory:()=>null},

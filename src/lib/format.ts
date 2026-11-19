@@ -80,6 +80,15 @@ export function formatDateTime(iso: string | null | undefined): string {
   }).format(new Date(iso));
 }
 
+export function formatDateShort(iso: string | null | undefined): string {
+  if (!iso) return NO_DATA;
+  return new Intl.DateTimeFormat('es-AR', {
+    timeZone: TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(iso));
+}
+
 /** Importes en pesos. Centralizado para no repetir el formato en cada vista. */
 export function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return NO_DATA;
@@ -88,5 +97,17 @@ export function formatCurrency(value: number | null | undefined): string {
     currency: 'ARS',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  });
+}
+
+/** Importes en pesos redondeados para tarjetas de lectura rápida (mantiene decimales si es menor a $100). */
+export function formatCurrencyCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return NO_DATA;
+  const decimals = Math.abs(value) < 100 ? 2 : 0;
+  return value.toLocaleString('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
 }

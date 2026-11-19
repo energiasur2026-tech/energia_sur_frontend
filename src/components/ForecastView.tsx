@@ -1,4 +1,5 @@
 'use client';
+import {useSearchParams} from 'next/navigation';
 import {ConfigureTariffLink} from './ConfigureTariffLink';
 import { useCallback,useRef,useState } from 'react';
 import { isMonthlyProjection,PROJECTION_CONTRACT_ERROR } from '@/lib/projection-contract';
@@ -9,23 +10,27 @@ import { GoalSetter } from './GoalSetter';
 import { MonthChart,HourlyProfile } from './LazyCharts';
 import type { MonthlyProjection } from '@/lib/monthly-projection';
 export function ForecastView({preview}:{preview?:MonthlyProjection}={}){
+ const search=useSearchParams();
+ const [billing,setBilling]=useState(!preview&&search?.get('period')==='billing');
  const [month,setMonth]=useState(''),[data,setData]=useState<MonthlyProjection|null>(preview??null),[error,setError]=useState('');
  const sequence=useRef(0);
- const refresh=useCallback(async()=>{if(preview)return;const id=++sequence.current;try{const r=await meterFetch('/api/meter/forecast'+(month?'?month='+month:''));const p=await r.json();if(id!==sequence.current)return;if(!r.ok)throw new Error(p.error??'No se pudo obtener la proyección.');if(!isMonthlyProjection(p)){setData(null);throw new Error(PROJECTION_CONTRACT_ERROR);}setData(p);setError('');}catch(e){if(id===sequence.current)setError(e instanceof Error?e.message:'Servicio no disponible.');}},[month,preview]);
+ const refresh=useCallback(async()=>{if(preview)return;const id=++sequence.current;try{const r=await meterFetch('/api/meter/forecast'+(billing?'?period=billing':month?'?month='+month:''));const p=await r.json();if(id!==sequence.current)return;if(!r.ok)throw new Error(p.error??'No se pudo obtener la proyección.');if(!isMonthlyProjection(p)){setData(null);throw new Error(PROJECTION_CONTRACT_ERROR);}setData(p);setError('');}catch(e){if(id===sequence.current)setError(e instanceof Error?e.message:'Servicio no disponible.');}},[month,preview,billing]);
  usePolling(refresh,300000);
  const g=data?.goal;
- return <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto"><header className="flex flex-wrap items-end justify-between gap-4 mb-6"><div><h1 className="text-xl md:text-2xl font-bold tracking-tight">Proyección</h1><p className="text-sm text-muted mt-1">Tu consumo, tu objetivo y una estimación del cierre del mes.</p></div><label className="text-xs text-muted">Mes analizado<input type="month" disabled={!!preview} aria-label="Mes analizado" value={month||data?.month||''} onChange={e=>{++sequence.current;setData(null);setMonth(e.target.value);}} className="block mt-1 rounded-xl border border-border-soft bg-surface p-2 text-foreground"/></label></header>
- {!preview&&<div className="mb-4"><button type="button" onClick={()=>void refresh()} className="text-sm text-accent underline py-2">Actualizar mediciones</button></div>}
+ return <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto"><header className="flex flex-wrap items-end justify-between gap-4 mb-6"><div><h1 className="text-xl md:text-2xl font-bold tracking-tight">Proyección</h1><p className="text-sm text-muted mt-1">Tu consumo, tu objetivo y una estimación del cierre del mes.</p></div><label className="text-xs text-muted">Mes analizado<input type="month" disabled={!!preview||billing} aria-label="Mes analizado" value={month||data?.month||''} onChange={e=>{++sequence.current;setData(null);setMonth(e.target.value);}} className="block mt-1 rounded-xl border border-border-soft bg-surface p-2 text-foreground"/></label></header>
+ {!preview&&<div className="mb-4 flex flex-wrap items-center gap-4">
+ <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={billing} onChange={event=>{++sequence.current;setData(null);setError('');setBilling(event.target.checked);}}/>Proyectar desde el cierre de factura</label>
+ <button type="button" onClick={()=>void refresh()} className="text-sm text-accent underline py-2">Actualizar mediciones</button></div>}
  {error&&<p role="alert" className="rounded-xl border border-danger/40 p-4 text-sm text-danger mb-5">{error}</p>}
  {!data&&<p className="text-sm text-muted py-12">{error?'No se pudo cargar este período.':'Consultando las mediciones del mes…'}</p>}
- {data&&g&&<><p className="text-xs text-muted mb-4">{data.meterName} · Mes calendario · hora de Argentina</p>
+ {data&&g&&<><p className="text-xs text-muted mb-4">{data.meterName} · {billing?(data.provisional?'Mes calendario actual — provisional':'Ciclo desde el cierre guardado · próximo cierre estimado'):'Mes calendario'} · hora de Argentina</p>
  <p className="text-xs text-warn mb-2">{data.tariff.note}</p>{!data.tariff.valid&&<ConfigureTariffLink/>}
- <GoalSetter key={JSON.stringify(data.choice)} preview={!!preview} role={data.role??'central'} goal={g} choice={data.choice} tariff={data.tariff} onSaved={refresh}/>
- <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-6 mb-6"><div className="flex flex-wrap gap-2 items-center justify-between mb-5"><h2 className="font-semibold text-sm">Cómo podría terminar {data.month}</h2><span className="text-xs rounded-full bg-accent-soft px-3 py-1 text-accent">Estimación por ritmo observado</span></div>
+ <GoalSetter billing={billing} key={JSON.stringify([billing,data.choice])} preview={!!preview} role={data.role??'central'} goal={g} choice={data.choice} tariff={data.tariff} onSaved={refresh}/>
+ <section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-6 mb-6"><div className="flex flex-wrap gap-2 items-center justify-between mb-5"><h2 className="font-semibold text-sm">{billing?'Cómo podría terminar el período actual':'Cómo podría terminar '+data.month}</h2><span className="text-xs rounded-full bg-accent-soft px-3 py-1 text-accent">Estimación por ritmo observado</span></div>
  <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-6">
  <Kpi title={data.missingStart?'Acumulado observado · parcial':'Consumo acumulado observado'} value={energy(data.measuredKwh)} hint={data.missingStart?'Desde la primera lectura disponible':'Hasta la última lectura'}/>
- <Kpi title="Objetivo mensual" value={energy(g.goalKwh)} hint={data.choice?.mode==='ars'?'Equivalente de '+formatCurrency(data.choice.value):'Energía definida por vos'}/>
- <Kpi title="Estimado al cierre" value={energy(g.projectedMonthKwh)} hint="Mes calendario completo"/>
+ <Kpi title={billing?'Objetivo del período':'Objetivo mensual'} value={energy(g.goalKwh)} hint={data.choice?.mode==='ars'?'Equivalente de '+formatCurrency(data.choice.value):'Energía definida por vos'}/>
+ <Kpi title="Estimado al cierre" value={energy(g.projectedMonthKwh)} hint={billing?'Hasta el próximo cierre estimado':'Mes calendario completo'}/>
  <Kpi title="Diferencia frente al objetivo" value={g.deviationKwh===null?'—':(g.deviationKwh>0?'+':'')+energy(g.deviationKwh)} hint={g.deviationKwh===null?'Faltan datos u objetivo':g.deviationKwh>0?'Por encima del objetivo':'Por debajo del objetivo'}/>
  <Kpi title="Promedio diario observado" value={energy(g.dailyRateKwh)} hint="Por 24 h de tiempo medido"/>
  <Kpi title={data.exceededKwh&&data.exceededKwh>0?'Objetivo ya superado':'Margen diario restante'} value={data.exceededKwh&&data.exceededKwh>0?energy(data.exceededKwh)+' de exceso':energy(g.remainingPerDayKwh)} hint={data.exceededKwh&&data.exceededKwh>0?'No es consumo permitido':data.missingStart?'Usa el inicio del mes estimado':'Tiempo restante, incluido el día parcial'}/>

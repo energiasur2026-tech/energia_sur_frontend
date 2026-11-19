@@ -20,6 +20,6 @@ Iniciar el frontend en desarrollo y abrir /dashboard?lumiSafetyTest=1. Solo en d
 
 La regla de una presentación por sesión sigue vigente. Para repetir en la misma pestaña, borrar únicamente la clave `energia-sur:lumi-safety:v1:<id-usuario>:session` de sessionStorage desde las herramientas del navegador, esperar el intervalo y recargar. Para iniciar desde cero, borrar también la clave homónima sin :session de localStorage. No borrar el resto del almacenamiento.
 
-Lumi → Consejos de seguridad permite consultar los tres consejos y desactivar presentaciones automáticas. Comprobar Tab, Escape, ampliación y cerrar. Escape primero reduce la imagen ampliada; luego cierra el diálogo y devuelve el foco al control de origen. Simular recurso no disponible para comprobar el texto alternativo de respaldo.
+Lumi → Consejos de seguridad permite consultar los tres consejos y desactivar presentaciones automáticas. Comprobar Tab, Escape y cerrar. Escape cierra el diálogo y devuelve el foco al control de origen. Las infografías originales de img_recomendaciones conservan su fondo blanco en ambos temas, sin controles de ampliación. Simular recurso no disponible para comprobar el texto alternativo de respaldo.
 
 Pruebas: node --test scripts/verify-lumi-safety.cjs scripts/verify-lumi-safety-ui.cjs scripts/verify-lumi-chat-reset.cjs (Node 22 o superior). La política usa tiempos simulados sin modificar los intervalos de producción.

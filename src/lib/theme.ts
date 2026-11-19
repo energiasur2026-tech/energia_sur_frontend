@@ -22,11 +22,13 @@ export const THEME_CHANGE_EVENT = 'energia-sur-themechange';
 
 export const DARK_MEDIA_QUERY = '(prefers-color-scheme: dark)';
 
-export function applyTheme(theme: Theme) {
-  document.documentElement.setAttribute('data-theme', theme);
+export function applyTheme(theme: Theme | 'system') {
+  if(theme==='system')document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', theme);
 
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    if(theme==='system')localStorage.removeItem(THEME_STORAGE_KEY);
+    else localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
     // Modo privado o almacenamiento bloqueado: el tema igual se aplica en
     // esta sesion, solo no sobrevive a la recarga.

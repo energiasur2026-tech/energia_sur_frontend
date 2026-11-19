@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Link2, Plus, RotateCw, X } from 'lucide-react';
+import { Link2, RotateCw, X } from 'lucide-react';
 import { PHASE_LABEL, type MeterPhases } from '@/domain/installation-types';
+import { DeviceArt, deviceKinds, type DeviceKind } from './DeviceArt';
 import { InfoTooltip } from './InfoTooltip';
 
 /**
@@ -31,11 +32,20 @@ import { InfoTooltip } from './InfoTooltip';
 
 export type LinkResult = {
   name: string;
+  deviceId: string;
+  supply: string;
   existingReadings: number;
 };
 
-export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => void }) {
-  const [open, setOpen] = useState(false);
+export function LinkMeterForm({ onLinked, onClose, supplies }: {
+  onLinked: (result: LinkResult) => void;
+  onClose: () => void;
+  supplies: string[];
+}) {
+  const [step,setStep]=useState(1);
+  const [kind,setKind]=useState<DeviceKind>('general');
+  const [supply,setSupply]=useState(supplies.length===1?supplies[0]:'');
+  const [area,setArea]=useState('');
   const [deviceId, setDeviceId] = useState('');
   const [name, setName] = useState('');
   const [phases, setPhases] = useState<MeterPhases>(1);
@@ -49,6 +59,7 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
     // El backend también limpia, pero si alguien pega algo con un salto de
     // línea conviene que lo vea limpio acá antes de mandarlo.
     const id = deviceId.trim();
+    if (saving||kind==='plug') return;
     if (id === '') {
       setError('Escribí el identificador del medidor.');
       setRetryable(false);
@@ -67,6 +78,7 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
           deviceId: id,
           name: name.trim() === '' ? undefined : name.trim(),
           phases,
+          ...(kind==='circuit'?{role:'area',areaLabel:area.trim()}:{}),
         }),
       });
       const payload = await response.json();
@@ -82,9 +94,10 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
       setDeviceId('');
       setName('');
       setPhases(1);
-      setOpen(false);
       onLinked({
         name: payload.meter.name as string,
+        deviceId:payload.meter.deviceId as string,
+        supply:supply.trim(),
         existingReadings: Number(payload.existingReadings ?? 0),
       });
     } catch {
@@ -95,39 +108,37 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border-soft px-4 py-4 text-sm font-semibold text-muted transition-colors hover:border-accent hover:text-accent"
-      >
-        <Plus className="h-4 w-4" />
-        Vincular un medidor
-      </button>
-    );
-  }
-
   return (
-    <section className="rounded-2xl border border-accent/40 bg-surface p-4 md:p-5 animate-fade-in">
+    <section aria-label="Vincular dispositivo" className="mb-6 rounded-2xl border border-border-soft bg-surface p-4 md:p-5">
       <div className="flex items-center gap-2 mb-1">
         <Link2 className="h-4 w-4 text-accent" />
-        <h2 className="text-sm font-semibold">Vincular un medidor</h2>
+        <h2 className="font-semibold">Vincular dispositivo</h2>
         <button
           type="button"
-          onClick={() => {
-            setOpen(false);
-            setError(null);
-          }}
+          onClick={onClose}
+          disabled={saving}
           aria-label="Cancelar"
           className="ml-auto text-muted transition-colors hover:text-foreground"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
-      <p className="text-xs text-muted leading-relaxed mb-4">
-        Sumá a tu cuenta un medidor que ya esté instalado y funcionando.
-      </p>
+      <p className="mb-4 text-xs text-muted" aria-live="polite">Paso {step} de 5 · {['Tipo de dispositivo','Suministro','Identificador','Personalización','Confirmación'][step-1]}</p>
+
+      {step===1&&<div className="grid gap-3 sm:grid-cols-3">
+        {(Object.keys(deviceKinds) as DeviceKind[]).map(option=><button key={option} type="button" aria-pressed={kind===option}
+          onClick={()=>setKind(option)} className={'rounded-xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-accent '+(kind===option?'border-accent bg-accent-soft':'border-border-soft')}>
+          <DeviceArt kind={option} className="mx-auto h-20 w-full" decorative/>
+          <span className="block text-sm font-semibold">{deviceKinds[option].label}</span>
+          <span className="mt-1 block text-xs text-muted">{deviceKinds[option].description}</span>
+        </button>)}
+      </div>}
+      {step===1&&kind==='plug'&&<p role="status" className="mt-3 text-sm text-muted">El flujo actual valida medidores Tuya. La compatibilidad de enchufes inteligentes con las lecturas todavía está pendiente.</p>}
+      {step===2&&<label className="block text-sm">Suministro o lugar
+        <input value={supply} onChange={event=>setSupply(event.target.value)} list="link-supplies" maxLength={60} className="mt-2 block w-full max-w-md rounded-xl border border-border-soft bg-surface-raised p-3" placeholder="Ej.: Casa o local"/>
+        <datalist id="link-supplies">{supplies.map(value=><option key={value} value={value}/>)}</datalist>
+        <span className="mt-2 block text-xs text-muted">Elegí un lugar existente, escribí uno nuevo o dejalo sin asignar. Se usa para organizar tus dispositivos en este navegador.</span>
+      </label>}
 
       {error && (
         <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3">
@@ -149,11 +160,11 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          if(step===5)void submit();
         }}
         className="space-y-4"
       >
-        <label className="block">
+        {step===3&&<label className="block">
           <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
             Identificador del medidor
             <InfoTooltip
@@ -165,7 +176,7 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
             type="text"
             value={deviceId}
             onChange={(event) => setDeviceId(event.target.value)}
-            placeholder="Ej: eb5095128f6c50f96akbbq"
+            placeholder="Identificador impreso en el equipo"
             autoComplete="off"
             spellCheck={false}
             className="mt-1.5 h-11 w-full rounded-xl border border-border-soft bg-surface-raised px-3 font-mono text-sm text-foreground outline-none focus:border-accent"
@@ -173,8 +184,9 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
           <span className="mt-1.5 block text-[11px] text-muted leading-relaxed">
             Está impreso en una etiqueta del equipo y en su caja.
           </span>
-        </label>
+        </label>}
 
+        {step===4&&<>
         <label className="block">
           <span className="text-[11px] font-bold uppercase tracking-wide text-muted">
             Nombre (opcional)
@@ -218,13 +230,23 @@ export function LinkMeterForm({ onLinked }: { onLinked: (result: LinkResult) => 
           </span>
         </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/85 disabled:opacity-60"
-        >
-          {saving ? 'Vinculando…' : 'Vincular medidor'}
-        </button>
+        {kind==='circuit'&&<label className="block text-sm">Circuito o ambiente
+          <input value={area} onChange={event=>setArea(event.target.value)} maxLength={40} className="mt-2 block w-full rounded-xl border border-border-soft bg-surface-raised p-3" placeholder="Ej.: Cocina"/>
+        </label>}
+        </>}
+        {step===5&&<div className="rounded-xl bg-surface-raised p-4 text-sm">
+          <p className="font-semibold">{name.trim()||'Medidor'} · {deviceKinds[kind].label}</p>
+          <p className="mt-1 text-muted">{supply.trim()||'Sin suministro asignado'}{area.trim()?' · '+area.trim():''} · {PHASE_LABEL[phases]}</p>
+          <p className="mt-2 text-muted">Se verificará el identificador en Tuya antes de vincular el equipo.</p>
+        </div>}
+        <div className="flex flex-wrap justify-end gap-3">
+          {step>1&&<button type="button" disabled={saving} className="rounded-xl border border-border-soft px-4 py-2 text-sm" onClick={()=>{setError(null);setStep(step-1);}}>Atrás</button>}
+          {step<5?<button type="button" disabled={kind==='plug'||step===3&&!deviceId.trim()||step===4&&kind==='circuit'&&!area.trim()}
+            onClick={()=>setStep(step+1)} className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Continuar</button>:
+            <button type="submit" disabled={saving} className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {saving?'Verificando…':'Confirmar y vincular'}
+            </button>}
+        </div>
       </form>
     </section>
   );

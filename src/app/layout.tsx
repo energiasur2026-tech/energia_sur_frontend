@@ -111,7 +111,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: LOADER_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      {/* Algunas extensiones agregan atributos a <body> antes de la hidratación. */}
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-background text-foreground">
         {/* Marcado plano, sin React: ver la nota en globals.css. */}
         <div id="app-loader" aria-hidden="true">
           <span className="animate-energia-pulse inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft">

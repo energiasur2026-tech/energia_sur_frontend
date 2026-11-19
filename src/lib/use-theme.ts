@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { currentTheme, DARK_MEDIA_QUERY, THEME_CHANGE_EVENT, type Theme } from './theme';
+import { currentTheme, readStoredTheme, DARK_MEDIA_QUERY, THEME_CHANGE_EVENT, type Theme } from './theme';
 
 function subscribe(onChange: () => void) {
   window.addEventListener(THEME_CHANGE_EVENT, onChange);
@@ -37,4 +37,8 @@ function subscribe(onChange: () => void) {
  */
 export function useTheme(): Theme {
   return useSyncExternalStore(subscribe, currentTheme, () => 'dark' as Theme);
+}
+
+export function useThemePreference() {
+  return useSyncExternalStore(subscribe, readStoredTheme, ()=>null)??'system';
 }

@@ -1,7 +1,7 @@
 'use client';
 import {ElectricityBreakdown} from './ElectricityBreakdown';
 import {TariffAndBillTools} from './TariffAndBillTools';
-import { meterFetch } from '@/lib/meter-fetch';
+import { BillingCycleForm } from './BillingCycleForm';
 
 import { useCallback, useRef, useState } from 'react';
 import { Info, Plug, Receipt } from 'lucide-react';
@@ -30,9 +30,6 @@ export function ConsumptionView() {
   const [period, setPeriod] = useState<PeriodKey | 'billing'>(DEFAULT_PERIOD);
   const [data, setData] = useState<ConsumptionPayload | null>(null);
   const [error, setError] = useState<ApiErrorPayload | null>(null);
-  const [closedOn,setClosedOn]=useState('');
-  const [savingClose,setSavingClose]=useState(false);
-  const closeEdited=useRef(false);
   const requestId=useRef(0);
 
   const fetchConsumption = useCallback(async () => {
@@ -51,7 +48,6 @@ export function ConsumptionView() {
 
       if(payload.period!==period){setData(null);throw new Error('El backend configurado no admite este período todavía. Actualizá el backend de EnergIA Sur.');}
       setData(payload as ConsumptionPayload);
-      if(period==='billing'&&!closeEdited.current)setClosedOn(payload.closedOn??'');
       setError(null);
     } catch (failure) {
       if(id!==requestId.current)return;
@@ -60,11 +56,6 @@ export function ConsumptionView() {
   }, [period, deviceId]);
 
   usePolling(fetchConsumption, POLL_INTERVAL_MS);
-  async function saveClose(event:React.FormEvent){event.preventDefault();if(!closedOn)return;++requestId.current;setData(null);setSavingClose(true);setError(null);
-    try{const response=await meterFetch('/api/meter/billing-cycle',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({closedOn})});const payload=await response.json().catch(()=>null);if(!response.ok)throw new Error(payload?.error??'El backend todavía no permite guardar el cierre. Debe estar actualizado.');closeEdited.current=false;await fetchConsumption();}
-    catch(e){setError({error:e instanceof Error?e.message:'No se pudo guardar el cierre.'});}finally{setSavingClose(false);}
-  }
-
   if (error?.missingEnv) {
     return <SetupNotice missing={error.missingEnv} />;
   }
@@ -105,12 +96,7 @@ export function ConsumptionView() {
         </div>
       </header>
 
-      {period==='billing'&&<section className="rounded-2xl border border-border-soft bg-surface p-4 md:p-5 mb-6">
-        <h2 className="text-sm font-semibold">Consumo desde el cierre de tu factura</h2>
-        <p className="text-xs text-muted mt-1">Indicá la fecha de cierre o inicio del nuevo período que figura en tu factura, no su vencimiento. Se cuenta desde las 00:00 de esa fecha, hora de Argentina.</p>
-        <form onSubmit={saveClose} className="mt-4 flex flex-wrap gap-3 items-end"><label className="text-xs text-muted">Fecha de cierre<input type="date" required value={closedOn} onChange={e=>{closeEdited.current=true;setClosedOn(e.target.value);}} max={data?.to?new Date(Date.parse(data.to)-10800000).toISOString().slice(0,10):undefined} className="block mt-1 rounded-xl border border-border-soft bg-surface-raised text-foreground px-3 py-2.5"/></label><button disabled={savingClose||!closedOn} className="rounded-xl bg-accent text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-50">{savingClose?'Guardando…':'Guardar cierre'}</button></form>
-        <p className="text-xs text-muted mt-3">Esta fecha se guarda para tu cuenta y este medidor. Actualizala cuando recibas el siguiente cierre; no se supone que todos los ciclos duran 30 días.</p>
-      </section>}
+      {period==='billing'&&<BillingCycleForm key={`billing-cycle:${deviceId ?? ''}`} onSaved={()=>void fetchConsumption()}/>}
       {period==='billing'&&data?.from&&<p className="text-xs text-muted mb-5">Período consultado: {formatDateTime(data.from)} a {formatDateTime(data.to)}.</p>}
       {period==='billing'&&data?.partialPeriod&&<p className="rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm text-warn mb-5">El historial no comienza exactamente en el cierre. Se muestra el consumo observado entre las lecturas disponibles, no el total completo del ciclo.</p>}
 
@@ -193,7 +179,7 @@ export function ConsumptionView() {
           la tabla mostraría una factura que no existe. */}
       {data?.available && data.cost && <ElectricityBreakdown cost={data.cost} />}
       {data?.available && !data.cost && <p className="text-sm text-warn mb-5">{data.costUnavailableReason??'No hay un cuadro documentado para el período elegido.'}</p>}
-      <TariffAndBillTools isArea={!!isArea} key={deviceId??'default'} onSaved={()=>void fetchConsumption()} />
+      <TariffAndBillTools isArea={!!isArea} key={`tariff-tools:${deviceId ?? ''}`} onSaved={()=>void fetchConsumption()} />
 
       {data?.available && isArea && (
         <p className="text-xs text-muted leading-relaxed animate-fade-in">

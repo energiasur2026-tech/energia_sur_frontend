@@ -27,13 +27,10 @@ test('one tip at a time, bounded navigation, scroll reset and arrow keys without
  fireEvent.click(screen.getByRole('button',{name:'Configurar frecuencia'}));const checkbox=screen.getByRole('checkbox');checkbox.focus();fireEvent.keyDown(checkbox,{key:'ArrowRight'});assert.ok(screen.getByText('Consejo 2 de 3'));
  assert.deepEqual(policy.readSafety(localStorage.getItem(key)),original);
 });
-test('same dialog zooms, pans and exits image mode with Escape before closing; focus and background scrolling restore',async()=>{
+test('viewer has no expand control; Escape closes and restores focus and scrolling',async()=>{
  document.body.style.position='relative';const dialog=await open();assert.equal(document.body.style.position,'fixed');assert.equal(document.documentElement.style.overflow,'hidden');
  const close=screen.getByRole('button',{name:'Cerrar consejos de seguridad'});close.focus();fireEvent.keyDown(close,{key:'Tab',shiftKey:true});assert.equal(document.activeElement,screen.getByRole('button',{name:'Configurar frecuencia'}));fireEvent.keyDown(document.activeElement,{key:'Tab'});assert.equal(document.activeElement,close);
- fireEvent.click(screen.getByRole('button',{name:'Ampliar imagen'}));assert.equal(document.querySelectorAll('dialog[open]').length,1);assert.equal(document.activeElement,screen.getByRole('button',{name:'← Volver al consejo'}));
- fireEvent.keyDown(dialog,{key:'ArrowRight'});assert.equal(screen.queryByText('Consejo 2 de 3'),null);
- fireEvent.click(screen.getByRole('button',{name:'Aumentar zoom'}));assert.ok(screen.getByText('1.5×'));fireEvent.change(screen.getByRole('slider'),{target:{value:75}});assert.equal(screen.getByRole('img').style.marginLeft,'-37.5%');
- cancel(dialog);assert.ok(screen.getByRole('button',{name:'Ampliar imagen'}));assert.equal(document.activeElement,screen.getByRole('button',{name:'Ampliar imagen'}));assert.ok(screen.getByText('Consejo 1 de 3'));
+ assert.equal(screen.queryByRole('button',{name:'Ampliar imagen'}),null);
  cancel(dialog);assert.equal(screen.queryByRole('dialog'),null);assert.equal(document.body.style.position,'relative');assert.equal(document.documentElement.style.overflow,'');await waitFor(()=>assert.equal(document.activeElement.id,'launcher'));
 });
 test('manual access persists disabling preference and survives missing artwork',async()=>{
@@ -44,7 +41,7 @@ test('manual access persists disabling preference and survives missing artwork',
 
 const silence=()=>{};const actions=[];
 const {LumiWidget}=load('src/components/lumi/LumiWidget.tsx',{
- './LumiSafety':{LumiSafety,OPEN_SAFETY},'@/lib/use-meter-id':{useMeterId:()=>null},'@/lib/lumi-category-help':{CATEGORY_HELP_OPEN:'test-category'},
+ './LumiSafety':{LumiSafety,OPEN_SAFETY},'@/lib/use-meter-id':{useMeterId:()=>null},'@/lib/lumi-open-tab':{LUMI_OPEN_TAB:'energia:lumi-open-tab'},'@/lib/lumi-category-help':{CATEGORY_HELP_OPEN:'test-category'},
  '@/lib/meter-fetch':{meterFetch:async(_url,options)=>{if(options?.body)actions.push(JSON.parse(options.body));return {ok:true,status:200,json:async()=>({version:'1',events:[],messages:[{role:'assistant',text:'Conversación conservada',at:'2026-11-16T12:00:00Z'}],preferences:{reducedMotion:true,soundsEnabled:false}})}}},
  '@/lib/use-polling':{usePolling:callback=>React.useEffect(()=>{void callback()},[callback])},
  './LumiAvatar':{LumiAvatar:()=>null},'./LumiHistory':{LumiHistory:({messages})=>React.createElement('div',null,messages.map((message,index)=>React.createElement('p',{key:index},message.text)))},

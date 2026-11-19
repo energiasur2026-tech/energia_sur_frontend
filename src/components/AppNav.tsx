@@ -1,12 +1,15 @@
 'use client';
 
 import { useNavigationPreferences } from './NavigationPreferences';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Gauge,
   LayoutGrid,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   Settings,
   TrendingUp,
@@ -20,7 +23,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 /** `short` es la etiqueta de la barra inferior, donde el ancho es escaso. */
 const LINKS = [
-  { href: '/medidores', label: 'Mis medidores', short: 'Medidores', icon: LayoutGrid },
+  { href: '/medidores', label: 'Mis dispositivos', short: 'Equipos', icon: LayoutGrid },
   { href: '/dashboard', label: 'Monitor', short: 'Monitor', icon: Gauge },
   { href: '/consumo', label: 'Consumo', short: 'Consumo', icon: Receipt },
   { href: '/proyeccion', label: 'Proyección', short: 'Objetivo', icon: TrendingUp },
@@ -28,8 +31,11 @@ const LINKS = [
   { href: '/ajustes', label: 'Ajustes', short: 'Ajustes', icon: Settings },
 ] as const;
 
+const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + '/');
+const focus = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
 export function AppNav({ userEmail }: { userEmail: string | null }) {
-  const { position } = useNavigationPreferences();
+  const { position, collapsed, save, waitForSave } = useNavigationPreferences();
   const pathname = usePathname();
   const router = useRouter();
   // El medidor elegido viaja en cada enlace de la barra. Sin esto, pasar de
@@ -38,6 +44,7 @@ export function AppNav({ userEmail }: { userEmail: string | null }) {
   const deviceId = useMeterId();
 
   async function onLogout() {
+    await waitForSave();
     await supabaseBrowser().auth.signOut();
     router.push('/login');
     router.refresh();
@@ -46,7 +53,14 @@ export function AppNav({ userEmail }: { userEmail: string | null }) {
   return (
     <>
       <MobileHeader onLogout={onLogout} />
-      {position === 'side' ? <SideNav pathname={pathname} deviceId={deviceId} userEmail={userEmail} onLogout={onLogout} /> : <TopNav
+      {position === 'side' ? <>
+        <SideNav pathname={pathname} deviceId={deviceId} collapsed={collapsed} onToggle={() => save({ collapsed: !collapsed })} />
+        <header className="app-sidebar-header hidden md:block border-b border-border-soft bg-navigation-surface">
+          <div className="mx-auto flex max-w-screen-2xl min-w-0 items-center justify-end px-4 py-2 lg:px-8">
+            <AccountControls userEmail={userEmail} onLogout={onLogout} deviceId={deviceId} />
+          </div>
+        </header>
+      </> : <TopNav
         pathname={pathname}
         deviceId={deviceId}
         userEmail={userEmail}
@@ -64,7 +78,7 @@ export function AppNav({ userEmail }: { userEmail: string | null }) {
  */
 function MobileHeader({ onLogout }: { onLogout: () => void }) {
   return (
-    <header className="md:hidden flex items-center justify-between gap-3 border-b border-border-soft bg-surface px-4 py-2.5">
+    <header className="md:hidden flex items-center justify-between gap-3 border-b border-border-soft bg-navigation-surface px-4 py-2.5">
       <span className="inline-flex items-center gap-2">
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft">
           <Zap className="h-4 w-4 text-accent" />
@@ -101,17 +115,17 @@ function TopNav({
   onLogout: () => void;
 }) {
   return (
-    <nav className="hidden md:block border-b border-border-soft bg-surface">
-      <div className="max-w-6xl mx-auto px-6 lg:px-8 flex items-center justify-between gap-4">
-        <div className="flex gap-1">
+    <nav aria-label="Navegación principal" className="hidden md:block border-b border-border-soft bg-navigation-surface">
+      <div className="max-w-6xl mx-auto px-4 lg:px-8 flex flex-wrap xl:flex-nowrap items-center justify-between gap-x-3">
+        <div className="flex flex-wrap gap-1">
           {LINKS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
+            const active = isActive(pathname, href);
             return (
               <Link
                 key={href}
                 href={meterHref(href, deviceId)}
                 aria-current={active ? 'page' : undefined}
-                className={`inline-flex items-center gap-2 px-3.5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-2 xl:px-3.5 py-3 text-sm font-medium border-b-2 transition-colors motion-reduce:transition-none ${focus} ${
                   active
                     ? 'border-accent text-foreground'
                     : 'border-transparent text-muted hover:text-foreground'
@@ -124,19 +138,7 @@ function TopNav({
           })}
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted">
-          <MeterPicker />
-          {userEmail && <span className="hidden lg:inline">{userEmail}</span>}
-          <ThemeToggle />
-          <button
-            type="button"
-            onClick={onLogout}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-muted transition-colors hover:text-foreground"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Salir
-          </button>
-        </div>
+        <AccountControls userEmail={userEmail} onLogout={onLogout} deviceId={deviceId} />
       </div>
     </nav>
   );
@@ -150,20 +152,22 @@ function TopNav({
 function BottomNav({ pathname, deviceId }: { pathname: string; deviceId: string | null }) {
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border-soft bg-surface"
+      aria-label="Navegación móvil"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border-soft bg-navigation-surface"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Las columnas se derivan de la cantidad de secciones: sumar una
           entrada a LINKS no obliga a tocar la grilla. */}
       <ul className="grid" style={{ gridTemplateColumns: `repeat(${LINKS.length}, minmax(0, 1fr))` }}>
-        {LINKS.map(({ href, short, icon: Icon }) => {
-          const active = pathname === href;
+        {LINKS.map(({ href, label, short, icon: Icon }) => {
+          const active = isActive(pathname, href);
           return (
             <li key={href}>
               <Link
                 href={meterHref(href, deviceId)}
+                aria-label={label}
                 aria-current={active ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
                   active ? 'text-accent' : 'text-muted'
                 }`}
               >
@@ -178,13 +182,66 @@ function BottomNav({ pathname, deviceId }: { pathname: string; deviceId: string 
   );
 }
 
-function SideNav({ pathname, deviceId, userEmail, onLogout }: { pathname: string; deviceId: string | null; userEmail: string | null; onLogout: () => void }) {
-  return <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-56 flex-col border-r border-border-soft bg-surface p-4 overflow-y-auto">
-    <div className="flex items-center gap-2 font-bold text-lg py-4"><Zap className="h-5 w-5 text-accent" />EnergIA Sur</div>
-    <div className="py-3"><MeterPicker /></div>
-    <nav aria-label="Navegación principal" className="flex flex-col gap-2 mt-3">
-      {LINKS.map(({ href, label, icon: Icon }) => <Link key={href} href={meterHref(href, deviceId)} aria-current={pathname === href ? 'page' : undefined} className={'flex items-center gap-3 rounded-xl px-3 py-3 text-sm focus-visible:outline-2 focus-visible:outline-accent ' + (pathname === href ? 'bg-accent-soft text-accent font-semibold' : 'text-muted hover:text-foreground')}><Icon className="h-4 w-4 shrink-0" />{label}</Link>)}
-    </nav>
-    <div className="mt-auto pt-6 space-y-4"><ThemeToggle /><p className="text-xs text-muted break-all">{userEmail}</p><button type="button" onClick={onLogout} className="flex items-center gap-2 text-sm py-3"><LogOut className="h-4 w-4" />Cerrar sesión</button></div>
-  </aside>;
+function AccountControls({ userEmail, deviceId, onLogout }: {
+  userEmail: string | null;
+  deviceId: string | null;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-1 py-1 text-xs text-muted sm:gap-2">
+      <MeterPicker />
+      <Link href={meterHref('/ajustes/mis-datos', deviceId)} title={userEmail ?? 'Mi cuenta'}
+        className={`max-w-44 truncate rounded-lg px-2 py-1.5 hover:text-foreground ${focus}`}>
+        <span className="sr-only">Mi cuenta</span>
+        <span aria-hidden="true">{userEmail ?? 'Mi cuenta'}</span>
+      </Link>
+      <ThemeToggle />
+      <button type="button" onClick={onLogout} aria-label="Cerrar sesión"
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-medium hover:text-foreground ${focus}`}>
+        <LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden lg:inline">Salir</span>
+      </button>
+    </div>
+  );
+}
+
+function SideNav({ pathname, deviceId, collapsed, onToggle }: {
+  pathname: string;
+  deviceId: string | null;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  const toggleLabel = collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral';
+  return (
+    <aside className={`app-sidebar hidden md:flex fixed inset-y-0 left-0 z-40 flex-col border-r border-border-soft bg-navigation-surface ${collapsed ? 'p-2' : 'p-3'}`}>
+      <div className={`flex min-h-12 items-center ${collapsed ? 'justify-center' : 'px-2'}`}>
+        <div className={collapsed ? 'w-[26px] overflow-hidden' : 'min-w-0'}>
+          <Image src="/assets/energia-sur-logo.png" alt="EnergIA Sur" width={2172} height={724} unoptimized
+            className={'sidebar-logo-light ' + (collapsed ? 'h-auto w-[139px] max-w-none' : 'h-auto w-44 max-w-full')} />
+          <Image src="/assets/energia-sur-logo-dark-mode.png" alt="EnergIA Sur" width={2170} height={725} unoptimized
+            className={'sidebar-logo-dark ' + (collapsed ? 'h-auto w-[139px] max-w-none' : 'h-auto w-44 max-w-full')} />
+        </div>
+      </div>
+      <nav id="desktop-sidebar-links" aria-label="Navegación principal" className="mt-3 flex flex-col gap-1">
+        {LINKS.map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link key={href} href={meterHref(href, deviceId)} aria-label={label}
+              title={collapsed ? label : undefined} aria-current={active ? 'page' : undefined}
+              className={`app-sidebar-link relative flex min-h-11 items-center gap-3 rounded-xl text-sm transition-colors duration-200 motion-reduce:transition-none ${focus} ${collapsed ? 'justify-center' : 'px-3'} ${active ? 'bg-accent-soft font-semibold text-accent' : 'text-muted hover:bg-surface-raised hover:text-foreground'}`}>
+              <Icon className="size-[18px] shrink-0" aria-hidden="true" />
+              {collapsed ? <span aria-hidden="true" className="app-sidebar-tooltip">{label}</span> : <span className="truncate">{label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mt-auto pt-3">
+        <button type="button" onClick={onToggle} aria-label={toggleLabel} aria-expanded={!collapsed} aria-controls="desktop-sidebar-links" title={toggleLabel}
+          className={`flex min-h-11 w-full items-center gap-3 rounded-xl text-sm text-muted hover:bg-surface-raised hover:text-foreground ${focus} ${collapsed ? 'justify-center' : 'px-3'}`}>
+          <ToggleIcon className="size-[18px] shrink-0" aria-hidden="true" />
+          {!collapsed && <span>Contraer menú</span>}
+        </button>
+      </div>
+    </aside>
+  );
 }

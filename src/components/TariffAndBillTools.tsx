@@ -4,6 +4,7 @@ import {useState} from 'react';
 import {meterFetch} from '@/lib/meter-fetch';
 import {formatCurrency,formatNumber} from '@/lib/format';
 import {ElectricityBreakdown} from './ElectricityBreakdown';
+import {TariffSimulator} from './TariffSimulator';
 import type {ElectricityBreakdown as Breakdown} from '@/lib/tariffs';
 type Comparison={status:string;appKwh:number|null;billedKwh?:number;deltaKwh:number|null;coverage?:number;firstAt?:string|null;lastAt?:string|null;electricityChargeCalculated?:number|null;electricityChargeBilled?:number;electricityDifference:number|null;pending:string[]};
 export function TariffAndBillTools({isArea=false}:{onSaved?:()=>void;isArea?:boolean}){
@@ -12,8 +13,9 @@ export function TariffAndBillTools({isArea=false}:{onSaved?:()=>void;isArea?:boo
  const [result,setResult]=useState<{comparison:Comparison;breakdown:Breakdown|null}|null>(null);
  const number=(text:string)=>/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d+)?$/.test(text.trim())?Number(text.trim().replace(/\./g,'').replace(',','.')):NaN;
  async function compare(event:React.FormEvent){event.preventDefault();setBusy(true);setMessage('');setResult(null);try{const r=await meterFetch('/api/meter/bill-comparison',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:new Date(from+(from.length===16?':00':'')+'-03:00').toISOString(),to:new Date(to+(to.length===16?':00':'')+'-03:00').toISOString(),billedKwh:number(kwh),electricityCharge:number(amount)})});const data=await r.json();if(!r.ok)throw new Error(data.error);setResult(data);}catch(error){setMessage(error instanceof Error?error.message:'No se pudo comparar.');}finally{setBusy(false);}}
- return <section className="rounded-2xl border border-border-soft bg-surface p-5 mb-6"><h2 className="font-semibold">Tarifa y comparación con tu factura</h2><p className="text-xs text-muted mt-2">La configuración del suministro se administra desde Ajustes. Los cuadros documentados de SPSE comienzan en julio de 2026; no incluyen otros servicios ni ajustes no verificados.</p>
+ return <section className="rounded-2xl border border-border-soft bg-surface p-5 mb-6"><h2 className="font-semibold">Tarifa y comparación con tu factura</h2><p className="text-xs text-muted mt-2">La configuración del suministro se administra desde Ajustes. La comparación usa el cuadro verificado para el período seleccionado y muestra los cargos eléctricos disponibles.</p>
  <ConfigureTariffLink/>
+ <TariffSimulator/>
  {isArea&&<p className="text-xs text-warn mt-4">Este medidor es de área: el costo es una referencia de ese sector. Para comparar toda la factura seleccioná el medidor central.</p>}
  <details className="mt-5"><summary className="cursor-pointer font-semibold text-sm">Comparar el intervalo facturado</summary><p className="text-xs text-muted mt-3">Usá ambas fechas y horas de lectura, no el mes de emisión ni el vencimiento. Horas de Argentina. Si la factura solo informa una fecha, necesitás el historial o la factura anterior; no inventes la otra. Si solo conocés el día, la comparación horaria será aproximada.</p>
  <form onSubmit={compare} className="grid sm:grid-cols-2 gap-3 mt-4">

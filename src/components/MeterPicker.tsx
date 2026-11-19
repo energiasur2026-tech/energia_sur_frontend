@@ -6,6 +6,7 @@ import { Check, ChevronDown, MapPin, Zap } from 'lucide-react';
 import { ROLE_LABEL, type MeterRole } from '@/domain/meter-role';
 import { useMeterId } from '@/lib/use-meter-id';
 import { usePolling } from '@/lib/use-polling';
+import { confirmDiscardSettingsDraft } from '@/lib/settings-draft';
 
 /**
  * De qué medidor habla la pantalla, cuando hay más de uno.
@@ -61,6 +62,8 @@ export function MeterPicker() {
   const actual = meters.find((meter) => meter.deviceId === selected) ?? meters[0];
 
   function choose(deviceId: string) {
+    if(deviceId===actual.deviceId){setOpen(false);return;}
+    if(!confirmDiscardSettingsDraft())return;
     setOpen(false);
     router.push(`${pathname}?deviceId=${encodeURIComponent(deviceId)}`);
   }

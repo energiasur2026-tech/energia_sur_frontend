@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "node scripts/prepare-invoice-assets.cjs",
     "start": "next start",
     "lint": "eslint",
     "test:lumi": "node --test scripts/verify-lumi-events.cjs scripts/verify-lumi-memory.cjs scripts/verify-lumi-sounds.cjs scripts/verify-lumi-chat-reset.cjs",
@@ -18,12 +19,15 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
+    "@tesseract.js-data/spa": "1.0.0",
     "framer-motion": "^13.1.1",
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
+    "pdfjs-dist": "5.6.205",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

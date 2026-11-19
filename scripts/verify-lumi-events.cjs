@@ -33,6 +33,13 @@ function Harness({ initial = [electrical, consultation] }) {
   return React.createElement(LumiEvents, { events, busy: false, onAction: async action => {
     calls.push(action);
     if (failNext) { failNext = false; return false; }
+    if (action.action === 'consultation') {
+      setEvents(previous => previous.map(event => state.isConsultation(event) && state.isPendingEvent(event)
+        && (action.operation === 'skipPending' || event.id === action.eventId)
+        ? { ...event, consultationStatus: action.operation === 'snooze' ? 'snoozed' : 'skipped' }
+        : event));
+      return true;
+    }
     setEvents(previous => previous.map(event => event.id !== action.eventId ? event : action.action === 'read'
       ? { ...event, read: action.read }
       : { ...event, userLabels: action.labels, otherEquipment: action.otherEquipment ?? '', answered: action.labels.length > 0, answeredAt: action.labels.length ? new Date().toISOString() : null }));
@@ -68,7 +75,7 @@ test('equipment choices remain local until save, can deselect and unknown is exc
   await click(user, 'Enviar respuesta');
   assert.deepEqual(current[0].userLabels, ['No recuerdo']);
   assert.equal(current[0].read, false);
-  assert.ok(screen.getByText('No tenés consultas pendientes'));
+  assert.ok(screen.getByText('No tenés avisos ni consultas pendientes'));
   assert.equal(screen.getByRole('button', { name: 'Pendientes (0)' }).getAttribute('aria-pressed'), 'true');
   await click(user, 'Ver en historial');
   assert.ok(screen.getByText('Tu respuesta:'));
@@ -181,6 +188,25 @@ test('history is collapsed, editing retains expanded record and event order', as
   assert.ok(screen.getByRole('button', { name: 'Editar respuesta' }));
   assert.deepEqual(order(), ['newer', 'older']);
 });
+test('empty messages follow the active category and consultation status', async () => {
+  const user = setup([]);
+  await click(user, 'Consultas (0)');
+  assert.ok(screen.getByRole('heading', { name: '¡Estás al día!' }));
+  assert.ok(screen.getByText('No tenés consultas pendientes'));
+  for (const [filter, message] of [
+    ['Respondidas', 'Todavía no hay consultas respondidas'],
+    ['Pospuestas', 'No tenés consultas pospuestas'],
+    ['Omitidas', 'No hay consultas omitidas'],
+    ['Historial (0)', 'Todavía no hay registros en el historial'],
+  ]) {
+    await click(user, filter);
+    assert.ok(screen.getByText(message));
+  }
+  await click(user, 'Avisos eléctricos (0)');
+  assert.ok(screen.getByText('No tenés avisos eléctricos pendientes'));
+  assert.equal(calls.length, 0);
+});
+
 test('both theme palettes keep selected text, dates, actions and focus distinguishable', () => {
   const css = fs.readFileSync(path.join(__dirname, '../src/app/globals.css'), 'utf8');
   const blocks = [css.match(/:root \{([\s\S]*?)\}/)[1], css.match(/:root\[data-theme="dark"\] \{([\s\S]*?)\}/)[1]];
@@ -189,11 +215,30 @@ test('both theme palettes keep selected text, dates, actions and focus distingui
     return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
   };
   const contrast = (a, b) => { const values = [luminance(a), luminance(b)].sort((a, b) => b - a); return (values[0] + .05) / (values[1] + .05); };
+  const tokens = block => Object.fromEntries([...block.matchAll(/--([a-z-]+):\s*([^;]+);/g)].map(m => [m[1], m[2]]));
   for (const block of blocks) {
-    const colors = Object.fromEntries([...block.matchAll(/--([a-z-]+): (#[a-f0-9]{6})/g)].map(m => [m[1], m[2]]));
-    for (const [text, background] of [['foreground','surface'],['foreground','surface-raised'],['foreground','accent-soft'],['muted','surface'],['muted','surface-raised'],['accent','surface'],['danger','surface']]) {
+    const values = { ...tokens(blocks[0]), ...tokens(block) };
+    const resolve = name => values[name].startsWith('var(--') ? resolve(values[name].slice(6, -1)) : values[name];
+    const colors = Object.fromEntries(Object.keys(values).map(key => [key, resolve(key)]));
+    for (const [text, background] of [['foreground','surface'],['foreground','surface-raised'],['foreground','accent-soft'],['muted','surface'],['muted','surface-raised'],['lumi-action-accent','surface'],['danger','surface']]) {
       assert.ok(contrast(colors[text], colors[background]) >= 4.5, text + ' on ' + background);
     }
-    assert.ok(contrast(colors.accent, colors['accent-soft']) >= 3, 'selected border/focus contrast');
+    assert.ok(contrast(colors['lumi-action-accent'], colors['accent-soft']) >= 3, 'selected border/focus contrast');
   }
+});
+
+
+test('snooze and bulk skip preserve the electrical alert and expose consultation filters', async () => {
+  const user = setup([electrical, consultation, { ...consultation, id: 'question2' }]);
+  await click(user, 'Consultas (2)');
+  await user.click(screen.getAllByRole('button', { name: 'Posponer 24 h' })[0]);
+  await click(user, 'Omitir consultas pendientes');
+  await click(user, 'Cancelar');
+  assert.equal(calls.length, 1);
+  await click(user, 'Omitir consultas pendientes');
+  await click(user, 'Omitir consultas');
+  await click(user, 'Omitidas');
+  assert.equal(current.find(event => event.id === 'electrical').read, false);
+  assert.equal(current.filter(event => event.consultationStatus === 'skipped').length, 1);
+  assert.equal(current.filter(event => event.consultationStatus === 'snoozed').length, 1);
 });
