@@ -14,7 +14,6 @@ import {
 } from 'recharts';
 import { formatAxisLabel, formatDateTime, formatNumber } from '@/lib/format';
 import type { EventRecord } from '@/lib/event-types';
-import type { MeterThresholds } from '@/lib/threshold-types';
 import type { SeriesPoint } from '@/lib/types';
 import { useChartColors } from '@/lib/use-chart-colors';
 import { apiUrl, useMeterId } from '@/lib/use-meter-id';
@@ -36,10 +35,8 @@ type Payload = { from: string; to: string; bucketSeconds: number; series: Series
 
 export function EventChart({
   event,
-  thresholds,
 }: {
   event: EventRecord;
-  thresholds: MeterThresholds | null;
 }) {
   // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
   const deviceId = useMeterId();
@@ -114,14 +111,7 @@ export function EventChart({
     return ms >= startMs && ms <= endMs;
   });
 
-  const threshold =
-    event.type === 'LOW_VOLTAGE'
-      ? thresholds?.lowVoltageV
-      : event.type === 'HIGH_VOLTAGE'
-        ? thresholds?.highVoltageV
-        : event.type === 'OVERCURRENT'
-          ? thresholds?.overcurrentA
-          : null;
+  const threshold = event.type === 'DATA_GAP' ? null : event.detectionThreshold;
 
   return (
     <div className="mt-4 rounded-xl border border-border-soft bg-surface-raised p-3">

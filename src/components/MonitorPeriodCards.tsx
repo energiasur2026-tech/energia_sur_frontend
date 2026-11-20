@@ -41,6 +41,7 @@ export type MonitorPeriod = {
     detectionCurrent?: boolean;
     count: number | null;
     active: number;
+    activeInPeriod?: number | null;
     totalActive?: number;
     resolved?: number | null;
     historicalCount?: number;
@@ -58,6 +59,7 @@ export function MonitorPeriodCards({
 }) {
   const spend = data?.spend ?? null;
   const anomalies = data?.anomalies ?? null;
+  const activeInPeriod = anomalies?.activeInPeriod ?? anomalies?.active ?? 0;
   const percent =
     spend?.spentArs != null && spend.goalArs != null && spend.goalArs > 0
       ? (100 * spend.spentArs) / spend.goalArs
@@ -284,7 +286,7 @@ export function MonitorPeriodCards({
               Anomalías del período
               <InfoTooltip
                 title="Anomalías del período"
-                text="Cuenta episodios iniciados en el rango: tensión fuera de umbral, sobrecorriente e interrupciones de lecturas. Los episodios anteriores que siguen abiertos se muestran entre los activos."
+                text="Cuenta episodios iniciados en el rango: tensión fuera de umbral, sobrecorriente e interrupciones de lecturas. El estado se toma del registro actual de cada episodio."
               />
             </h2>
             {anomaliesRangeLabel && (
@@ -292,7 +294,7 @@ export function MonitorPeriodCards({
             )}
           </div>
 
-          {anomalies?.provisional && <p className="mt-1 text-xs text-muted">Mes calendario actual — provisional</p>}
+          {anomalies?.from && <p className="mt-1 text-xs text-muted">Mes calendario actual</p>}
           {anomalies ? (
             <div className="mt-2 space-y-2">
               {anomalies.count != null ? (
@@ -308,26 +310,22 @@ export function MonitorPeriodCards({
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">Período sin configurar</p>
-                  <p className="text-xs text-muted">
-                    Guardá la fecha de cierre de factura en Ajustes para contabilizar los episodios
-                    de tu período.
-                  </p>
+                  <p className="text-sm font-medium text-foreground">Resumen del período no disponible</p>
                 </div>
               )}
 
               <div className="flex flex-wrap items-center gap-2">
-                {anomalies.active > 0 ? (
+                {activeInPeriod > 0 ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">
                     <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
-                    {anomalies.active === 1
-                      ? '1 anomalía activa'
-                      : `${anomalies.active} anomalías activas`}
+                    {activeInPeriod === 1
+                      ? '1 anomalía activa en el período'
+                      : `${activeInPeriod} anomalías activas en el período`}
                   </span>
                 ) : anomalies.detectionCurrent ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 text-xs font-semibold text-ok">
                     <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    0 anomalías activas registradas
+                    0 anomalías activas en el período
                   </span>
                 ) : (
                   <span className="text-xs font-medium text-muted">0 abiertas registradas · estado sin confirmar por falta de datos recientes</span>
@@ -337,8 +335,8 @@ export function MonitorPeriodCards({
               {anomalies.resolved != null && (
                 <p className="text-xs text-muted">
                   {anomalies.resolved === 1
-                    ? '1 episodio resuelto en este período.'
-                    : `${anomalies.resolved} episodios resueltos en este período.`}
+                    ? '1 episodio del período ya resuelto.'
+                    : `${anomalies.resolved} episodios del período ya resueltos.`}
                 </p>
               )}
             </div>
@@ -348,15 +346,13 @@ export function MonitorPeriodCards({
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
-          <Link className={primaryLink} href={meterHref('/eventos', deviceId)}>
+          <Link className={primaryLink} href={meterHref(anomalies?.from
+            ? `/eventos?${new URLSearchParams({ period: 'current', from: anomalies.from, to: anomalies.to })}`
+            : '/eventos?period=current', deviceId)}>
             Ver historial
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
-          {anomalies && (anomalies.provisional || anomalies.count === null) && (
-            <Link className={secondaryLink} href={meterHref('/ajustes/servicio', deviceId)}>
-              Configurar período
-            </Link>
-          )}
+
         </div>
       </section>
     </div>

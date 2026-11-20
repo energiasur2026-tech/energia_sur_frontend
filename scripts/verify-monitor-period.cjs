@@ -11,6 +11,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
+let query = new URLSearchParams();
 
 function loadTsModule(filePath, cache = new Map()) {
   const abs = path.resolve(filePath);
@@ -39,9 +40,10 @@ function loadTsModule(filePath, cache = new Map()) {
     }
     if (specifier === 'next/navigation') {
       return {
-        useSearchParams: () => new URLSearchParams(),
+        useSearchParams: () => query,
       };
     }
+    if (specifier === './LazyCharts') return { EventChart: () => null };
     if (specifier.startsWith('@/')) {
       return loadTsModule(resolveWithExt(path.join(SRC, specifier.slice(2))), cache);
     }
@@ -90,7 +92,7 @@ test('objetivo en pesos: muestra gasto, objetivo, porcentaje, barra, proyección
         projectionReason: null,
       },
       anomalies: {
-        from: '2026-10-28T03:00:00.000Z',
+        from: '2026-11-01T03:00:00.000Z',
         to: '2026-11-18T03:00:00.000Z',
         count: 3,
         active: 1,
@@ -112,8 +114,8 @@ test('objetivo en pesos: muestra gasto, objetivo, porcentaje, barra, proyección
   assert.match(html, /Anomalías del período/);
   assert.match(html, />3<\/p>/);
   assert.match(html, /1 anomalía activa/);
-  assert.match(html, /2 episodios resueltos en este período/);
-  assert.match(html, /href="\/eventos\?deviceId=meter-42"/);
+  assert.match(html, /2 episodios del período ya resueltos/);
+  assert.match(html, /href="\/eventos\?period=current&amp;from=2026-11-01T03%3A00%3A00.000Z&amp;to=2026-11-18T03%3A00%3A00.000Z&amp;deviceId=meter-42"/);
 });
 
 test('objetivo sin configurar: muestra gasto sin barra de progreso falsa', () => {
@@ -146,7 +148,7 @@ test('objetivo sin configurar: muestra gasto sin barra de progreso falsa', () =>
   assert.match(html, /12\.300/);
   assert.match(html, /Sin objetivo económico configurado/);
   assert.doesNotMatch(html, /role="progressbar"/);
-  assert.match(html, /0 anomalías activas registradas/);
+  assert.match(html, /0 anomalías activas en el período/);
 });
 
 test('tarifas no disponibles y lecturas insuficientes nunca muestran $0 falso', () => {
@@ -180,8 +182,7 @@ test('tarifas no disponibles y lecturas insuficientes nunca muestran $0 falso', 
   assert.match(noTariff, /21,00 kWh/);
   assert.match(noTariff, /Configurar en Ajustes/);
   assert.doesNotMatch(noTariff, /\$\s*0\b/);
-  assert.match(noTariff, /Período sin configurar/);
-  assert.match(noTariff, /Configurar período/);
+  assert.match(noTariff, /Resumen del período no disponible/);
 
   const noReadings = render({
     failed: false,
@@ -199,7 +200,7 @@ test('tarifas no disponibles y lecturas insuficientes nunca muestran $0 falso', 
         projectionReason: null,
       },
       anomalies: {
-        from: '2026-11-15T03:00:00.000Z',
+        from: '2026-11-01T03:00:00.000Z',
         to: '2026-11-18T03:00:00.000Z',
         count: 0,
         active: 0,
@@ -226,4 +227,70 @@ test('mes provisional y detección desactualizada muestran su alcance', () => {
   assert.match(html, /Proyección a fin de mes/);
   assert.match(html, /estado sin confirmar/);
   assert.doesNotMatch(html, /Normal/);
+});
+
+test('Eventos recibe el rango de Monitor, combina filtros y restablece la vista', async (t) => {
+  const { JSDOM } = require('jsdom');
+  const dom = new JSDOM('<html><body></body></html>', { url: 'http://localhost' });
+  t.mock.method(globalThis, 'fetch', async (value) => {
+    const url = new URL(value, 'http://localhost');
+    requests.push(Object.fromEntries(url.searchParams));
+    return { ok: true, json: async () => ({
+      bounds: url.searchParams.get('period') === 'all' ? { from: null, lastDay: null } : { from, lastDay: to },
+      events: url.searchParams.get('period') === 'custom' ? [] : episodes,
+    }) };
+  });
+  dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  const { render, screen, fireEvent, cleanup, within } = require('@testing-library/react/pure');
+  t.after(() => {
+    cleanup();
+    dom.window.close();
+    delete globalThis.window;
+    delete globalThis.document;
+    query = new URLSearchParams();
+  });
+
+  const requests = [];
+  const from = '2026-11-01T03:00:00.000Z';
+  const to = '2026-11-19T11:00:00.000Z';
+  query = new URLSearchParams({ period: 'current', from, to, deviceId: 'meter-42' });
+  const startedAt = '2026-11-18T14:00:00.000Z';
+  const episodes = [
+    { id: 1, type: 'OVERCURRENT', severity: 'CRITICAL', startedAt, endedAt: startedAt,
+      lastViolationAt: startedAt, samples: 1, maxCurrent: 18.2, detectionThreshold: 14 },
+    { id: 2, type: 'LOW_VOLTAGE', severity: 'WARNING', startedAt, endedAt: null,
+      lastViolationAt: '2026-11-18T14:15:00.000Z', samples: 2, minVoltage: 199 },
+  ];
+  const { EventsView } = loadTsModule(path.join(SRC, 'components/EventsView.tsx'));
+  render(React.createElement(EventsView));
+
+  const summary = () => screen.getByRole('region', { name: 'Resumen de anomalías' });
+  await screen.findByText('Período de Monitor · 1/11 al 19/11');
+  assert.deepEqual(requests[0], { period: 'current', from, to, deviceId: 'meter-42', meterId: 'meter-42' });
+  assert.match(summary().textContent, /2 episodios detectados · 1 en curso · 1 resuelto/);
+  const resolved = screen.getByText('Resuelto').closest('li');
+  assert.ok(within(resolved).getByText('Crítico'));
+  assert.ok(within(resolved).getByText('Detectado en una lectura'));
+  fireEvent.click(within(resolved).getByRole('button', { name: 'Ver qué pasó' }));
+  assert.ok(within(resolved).getByText(/umbral de 14,0 A/));
+
+  fireEvent.click(screen.getByRole('button', { name: 'En curso' }));
+  assert.match(summary().textContent, /1 episodio detectado · 1 en curso · 0 resueltos/);
+  fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'OVERCURRENT' } });
+  assert.ok(screen.getByText('Ningún evento coincide con los filtros elegidos.'));
+  fireEvent.change(screen.getByLabelText('Período'), { target: { value: '7d' } });
+  await screen.findByText(/Últimos 7 días · /);
+  assert.deepEqual(requests.at(-1), { period: '7d', deviceId: 'meter-42', meterId: 'meter-42' });
+
+  fireEvent.change(screen.getByLabelText('Período'), { target: { value: 'custom' } });
+  fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-11-18' } });
+  fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-11-18' } });
+  await screen.findByText(/Personalizado · /);
+  assert.deepEqual(requests.at(-1), { period: 'custom', from: '2026-11-18', to: '2026-11-18', deviceId: 'meter-42', meterId: 'meter-42' });
+  fireEvent.click(screen.getByRole('button', { name: 'Restablecer filtros' }));
+  await screen.findByText('Todo el historial', { selector: 'span' });
+  assert.equal(screen.getByLabelText('Tipo').value, 'ALL');
+  assert.equal(screen.getByRole('button', { name: 'Todos' }).getAttribute('aria-pressed'), 'true');
 });

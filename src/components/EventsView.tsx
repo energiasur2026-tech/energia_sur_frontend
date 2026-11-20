@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, ChevronDown, CircleAlert, Info, ShieldCheck } from 'lucide-react';
-import { formatDateTime, formatDuration, formatNumber } from '@/lib/format';
+import { formatDateShort, formatDateTime, formatDuration, formatNumber } from '@/lib/format';
 import {
   EVENT_DESCRIPTION,
   EVENT_LABEL,
@@ -21,7 +22,12 @@ import { SetupNotice } from './SetupNotice';
 
 const POLL_INTERVAL_MS = 60000;
 
-type Payload = { events: EventRecord[]; thresholds: MeterThresholds | null };
+type Payload = {
+  events: EventRecord[];
+  thresholds: MeterThresholds | null;
+  effectiveGapMinutes: number;
+  bounds: { from: string | null; lastDay: string | null };
+};
 
 const SEVERITY_STYLE: Record<EventSeverity, { chip: string; icon: typeof Info; label: string }> = {
   INFO: { chip: 'border-border-soft bg-surface-raised text-muted', icon: Info, label: 'Informativo' },
@@ -29,18 +35,7 @@ const SEVERITY_STYLE: Record<EventSeverity, { chip: string; icon: typeof Info; l
   CRITICAL: { chip: 'border-danger/40 bg-danger/10 text-danger', icon: CircleAlert, label: 'Crítico' },
 };
 
-/**
- * Los tres campos de filtro comparten alto y estilo. `h-11` (44 px) es ademas
- * el minimo recomendado para un objetivo tactil, y hace que `<select>` e
- * `<input type="date">` midan igual pese a sus alturas intrinsecas distintas.
- */
-/**
- * `min-w-0` no es decorativo: un item de grilla tiene `min-width: auto`, o sea
- * que no puede achicarse por debajo de su contenido. Safari en iOS dibuja la
- * fecha como "14 ago 2026" —bastante mas ancha que el "14/08/2026" de Chrome—
- * y ese ancho intrinseco estiraba la celda hasta desbordar la tarjeta, con un
- * campo mas ancho que el otro. Con `min-w-0` la celda manda sobre el contenido.
- */
+// A fixed height keeps native date inputs and selects aligned across browsers.
 const FILTER_FIELD =
   'h-11 w-full min-w-0 rounded-xl border border-border-soft bg-surface-raised px-3 text-sm text-foreground outline-none focus:border-accent';
 
@@ -55,65 +50,49 @@ const TYPE_FILTERS: { value: EventType | 'ALL'; label: string }[] = [
   { value: 'DATA_GAP', label: EVENT_LABEL.DATA_GAP },
 ];
 
+const PERIODS = [
+  { value: 'current', label: 'Período actual' },
+  { value: '7d', label: 'Últimos 7 días' },
+  { value: '30d', label: 'Últimos 30 días' },
+  { value: 'custom', label: 'Personalizado' },
+  { value: 'all', label: 'Todo el historial' },
+] as const;
+type Period = typeof PERIODS[number]['value'];
+
 export function EventsView() {
-  // De qué medidor habla esta pantalla. Lo dice la dirección del navegador.
   const deviceId = useMeterId();
-  const [data, setData] = useState<Payload | null>(null);
-  const [error, setError] = useState<ApiErrorPayload | null>(null);
+  const params = useSearchParams();
+  const from = params.get('from');
+  const to = params.get('to');
+  const fromMonitor = params.get('period') === 'current';
+  return <EventsFilters key={JSON.stringify([deviceId, fromMonitor, from, to])}
+    deviceId={deviceId} fromMonitor={fromMonitor} from={from} to={to} />;
+}
+
+function EventsFilters({ deviceId, fromMonitor, from, to }: {
+  deviceId: string | null;
+  fromMonitor: boolean;
+  from: string | null;
+  to: string | null;
+}) {
+  const [period, setPeriod] = useState<Period>(fromMonitor ? 'current' : 'all');
+  const [pinned, setPinned] = useState(fromMonitor && !!from && !!to);
   const [onlyActive, setOnlyActive] = useState(false);
   const [typeFilter, setTypeFilter] = useState<EventType | 'ALL'>('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  const fetchEvents = useCallback(async () => {
-    try {
-      const response = await fetch(apiUrl('/api/meter/events', deviceId), { cache: 'no-store' });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        setError(payload as ApiErrorPayload);
-        return;
-      }
-
-      setData(payload as Payload);
-      setError(null);
-    } catch {
-      setError({ error: 'No se pudo contactar al servidor.' });
-    }
-  }, [deviceId]);
-
-  usePolling(fetchEvents, POLL_INTERVAL_MS);
-
-  const events = useMemo(() => data?.events ?? [], [data]);
-  const active = useMemo(() => events.filter((e) => e.endedAt === null), [events]);
-
-  /**
-   * El filtrado ocurre en el navegador porque el historial completo ya vino en
-   * la respuesta: pedirlo de nuevo al servidor por cada cambio de filtro
-   * sumaría latencia sin traer nada nuevo.
-   */
-  const visible = useMemo(() => {
-    // Las fechas del formulario se interpretan en hora de Argentina (-03:00)
-    // para coincidir exactamente con los límites del período de facturación.
-    const fromMs = fromDate ? new Date(`${fromDate}T00:00:00-03:00`).getTime() : null;
-    const toMs = toDate ? new Date(`${toDate}T23:59:59.999-03:00`).getTime() : null;
-
-    return events.filter((event) => {
-      if (onlyActive && event.endedAt !== null) return false;
-      if (typeFilter !== 'ALL' && event.type !== typeFilter) return false;
-
-      const startedMs = new Date(event.startedAt).getTime();
-      if (fromMs !== null && startedMs < fromMs) return false;
-      if (toMs !== null && startedMs > toMs) return false;
-
-      return true;
-    });
-  }, [events, onlyActive, typeFilter, fromDate, toDate]);
-
-  const filtersApplied = typeFilter !== 'ALL' || fromDate !== '' || toDate !== '' || onlyActive;
-
-  if (error?.missingEnv) return <SetupNotice missing={error.missingEnv} />;
+  const filtersApplied = period !== 'all' || typeFilter !== 'ALL' || onlyActive;
+  const params = new URLSearchParams({ period });
+  if (pinned && from && to) {
+    params.set('from', from);
+    params.set('to', to);
+  }
+  if (period === 'custom') {
+    if (fromDate) params.set('from', fromDate);
+    if (toDate) params.set('to', toDate);
+  }
+  const url = apiUrl(`/api/meter/events?${params}`, deviceId);
+  const invalidDates = period === 'custom' && !!fromDate && !!toDate && fromDate > toDate;
 
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-6xl w-full mx-auto">
@@ -124,26 +103,18 @@ export function EventsView() {
         </p>
       </header>
 
-      {error && !error.missingEnv && (
-        <p className="mb-6 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error.error}
-        </p>
-      )}
-
-      <section className="mb-6 rounded-2xl border border-border-soft bg-surface p-4">
-        {/* Grilla en vez de `flex`: `<select>` e `<input type="date">` tienen
-            alturas intrinsecas distintas segun el navegador, y alineados por
-            abajo sus etiquetas quedaban a distinta altura. Con columnas
-            explicitas y una altura fija para los tres campos, las etiquetas y
-            las cajas quedan a la misma linea.
-
-            En celular cada campo ocupa la fila entera. Safari en iOS le impone
-            a `input[type=date]` un ancho minimo interno que `width: 100%` no
-            puede vencer, asi que en media columna el campo se desbordaba de la
-            tarjeta y quedaba mas ancho que su par. A fila completa esa
-            condicion no existe, y de paso el area para tocar es mas grande. */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-          <label className="col-span-2 min-w-0 md:col-span-1">
+      <section className="mb-4 rounded-2xl border border-border-soft bg-surface p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
+          <label className="min-w-0">
+            <span className={FILTER_LABEL}>Período</span>
+            <select value={period} className={FILTER_FIELD} onChange={(e) => {
+              setPinned(false);
+              setPeriod(e.target.value as Period);
+            }}>
+              {PERIODS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className="min-w-0">
             <span className={FILTER_LABEL}>Tipo</span>
             <select
               value={typeFilter}
@@ -158,31 +129,7 @@ export function EventsView() {
             </select>
           </label>
 
-          <label className="col-span-2 min-w-0 md:col-span-1">
-            <span className={FILTER_LABEL}>Desde</span>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className={FILTER_FIELD}
-            />
-          </label>
-
-          <label className="col-span-2 min-w-0 md:col-span-1">
-            <span className={FILTER_LABEL}>Hasta</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className={FILTER_FIELD}
-            />
-          </label>
-
-          {/* Interruptor con las dos opciones a la vista. Un boton que
-              rotara entre estados ocuparia menos, pero esconde la alternativa:
-              quien entra por primera vez ve una sola opcion y no tiene forma
-              de saber que hay otra salvo tocando a ver que pasa. */}
-          <div className="col-span-2 md:col-span-1 md:w-48">
+          <div className="sm:self-end lg:w-48">
             <SwitchToggle
               label="Qué eventos mostrar"
               value={onlyActive ? 'activos' : 'todos'}
@@ -191,81 +138,152 @@ export function EventsView() {
                 { value: 'todos', label: 'Todos' },
                 {
                   value: 'activos',
-                  label: active.length > 0 ? `En curso (${active.length})` : 'En curso',
+                  label: 'En curso',
                 },
               ]}
             />
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-          <span>
-            {visible.length === events.length
-              ? `${events.length} evento${events.length === 1 ? '' : 's'}`
-              : `${visible.length} de ${events.length} eventos`}
-          </span>
-          {filtersApplied && (
-            <button
-              type="button"
-              onClick={() => {
-                setTypeFilter('ALL');
-                setFromDate('');
-                setToDate('');
-                setOnlyActive(false);
-              }}
-              className="font-semibold text-accent hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          )}
-        </div>
+        {period === 'custom' && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="min-w-0">
+              <span className={FILTER_LABEL}>Desde</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className={FILTER_FIELD}
+              />
+            </label>
+
+            <label className="min-w-0">
+              <span className={FILTER_LABEL}>Hasta</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className={FILTER_FIELD}
+              />
+            </label>
+          </div>
+        )}
+        {filtersApplied && (
+          <button type="button" className="mt-3 text-xs font-semibold text-accent hover:underline" onClick={() => {
+            setTypeFilter('ALL');
+            setOnlyActive(false);
+            setPeriod('all');
+            setPinned(false);
+            setFromDate('');
+            setToDate('');
+          }}>
+            Restablecer filtros
+          </button>
+        )}
       </section>
 
+      {invalidDates ? <p role="alert" className="text-sm text-danger">La fecha Desde debe ser anterior o igual a Hasta.</p> : (
+        <EventResults key={url} url={url} onlyActive={onlyActive} typeFilter={typeFilter}
+          filtered={filtersApplied} fromMonitor={pinned} period={period} />
+      )}
+    </div>
+  );
+}
+
+function EventResults({ url, onlyActive, typeFilter, filtered, fromMonitor, period }: {
+  url: string;
+  onlyActive: boolean;
+  typeFilter: EventType | 'ALL';
+  filtered: boolean;
+  fromMonitor: boolean;
+  period: Period;
+}) {
+  const [data, setData] = useState<Payload | null>(null);
+  const [error, setError] = useState<ApiErrorPayload | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload as ApiErrorPayload);
+        return;
+      }
+      setData(payload as Payload);
+      setError(null);
+    } catch {
+      setError({ error: 'No se pudo contactar al servidor.' });
+    }
+  }, [url]);
+  usePolling(fetchEvents, POLL_INTERVAL_MS);
+
+  if (error?.missingEnv) return <SetupNotice missing={error.missingEnv} />;
+  if (error) return <p role="alert" className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm text-danger">{error.error}</p>;
+  if (!data) return <p role="status" className="py-12 text-center text-sm text-muted">Cargando eventos…</p>;
+
+  const visible = data.events.filter((event) =>
+    (!onlyActive || event.endedAt === null) && (typeFilter === 'ALL' || event.type === typeFilter));
+  const active = visible.filter((event) => event.endedAt === null).length;
+  const resolved = visible.length - active;
+  const { from, lastDay } = data.bounds;
+  const label = PERIODS.find((option) => option.value === period)?.label;
+  const range = from && lastDay ? `${formatDateShort(from)} al ${formatDateShort(lastDay)}`
+    : from ? `Desde el ${formatDateShort(from)}`
+    : lastDay ? `Hasta el ${formatDateShort(lastDay)}` : '';
+  return (
+    <>
+      <section aria-label="Resumen de anomalías" className="mb-4 rounded-xl border border-border-soft bg-surface px-4 py-3 text-xs">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-sm font-semibold">Anomalías del período</h2>
+          <span className="text-muted">{fromMonitor ? 'Período de Monitor' : label}{range && ` · ${range}`}</span>
+        </div>
+        <p aria-live="polite" className="mt-1.5 text-muted">
+          <strong className="text-foreground">{visible.length}</strong> {visible.length === 1 ? 'episodio detectado' : 'episodios detectados'} · {active} en curso · {resolved} {resolved === 1 ? 'resuelto' : 'resueltos'}
+        </p>
+      </section>
       {data?.thresholds && (
-        <div className="mb-6 rounded-xl border border-border-soft bg-surface px-4 py-3 text-xs text-muted">
-          <p className="font-semibold text-foreground mb-1.5">Se considera anomalía cuando</p>
+        <div className="mb-4 rounded-xl border border-border-soft bg-surface px-4 py-3 text-xs text-muted">
+          <p className="font-semibold text-foreground mb-1.5">Umbrales vigentes del medidor</p>
           <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4">
             <li>Tensión menor a {formatNumber(data.thresholds.lowVoltageV, 1)} V</li>
             <li>Tensión mayor a {formatNumber(data.thresholds.highVoltageV, 1)} V</li>
             <li>Corriente mayor a {formatNumber(data.thresholds.overcurrentA, 1)} A</li>
-            <li>Más de {data.thresholds.gapMinutes} min sin lecturas</li>
+            <li>Más de {data.effectiveGapMinutes} min sin lecturas</li>
           </ul>
         </div>
       )}
 
       {visible.length === 0 ? (
-        <EmptyState filtered={filtersApplied} loaded={data !== null} />
+        <EmptyState filtered={filtered} />
       ) : (
         // La `key` incluye los filtros: al cambiarlos, React reemplaza la
         // lista y el desvanecido vuelve a correr, que es justo la senal de que
         // el resultado cambio.
         <ul
-          key={`${typeFilter}-${fromDate}-${toDate}-${onlyActive}`}
+          key={`${typeFilter}-${onlyActive}`}
           className="space-y-3 animate-fade-in"
         >
           {visible.map((event) => (
             <EventCard
               key={event.id}
               event={event}
-              thresholds={data?.thresholds ?? null}
               expanded={expandedId === event.id}
               onToggle={() => setExpandedId(expandedId === event.id ? null : event.id)}
             />
           ))}
         </ul>
       )}
-    </div>
+    </>
   );
 }
 
 function EventCard({
   event,
-  thresholds,
   expanded,
   onToggle,
 }: {
   event: EventRecord;
-  thresholds: MeterThresholds | null;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -288,15 +306,21 @@ function EventCard({
           </span>
           <h3 className="text-sm font-semibold">{EVENT_LABEL[event.type]}</h3>
           <InfoTooltip text={EVENT_DESCRIPTION[event.type]} title={EVENT_LABEL[event.type]} />
-          {ongoing && (
+          {ongoing ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">
               <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
               En curso
             </span>
+          ) : (
+            <span className="rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 text-xs font-semibold text-ok">Resuelto</span>
           )}
         </div>
         <span className="text-xs text-muted shrink-0">
-          Duró {formatDuration(event.startedAt, event.endedAt)}
+          {event.samples === 1 && event.type !== 'DATA_GAP'
+            ? 'Detectado en una lectura'
+            : event.type === 'DATA_GAP'
+              ? `Intervalo sin lecturas · ${formatDuration(event.startedAt, event.endedAt)}`
+              : `Entre lecturas anómalas · ${formatDuration(event.startedAt, event.lastViolationAt)}`}
         </span>
       </div>
 
@@ -323,7 +347,7 @@ function EventCard({
         aria-expanded={expanded}
         className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
       >
-        {expanded ? 'Ocultar gráfico' : 'Ver qué pasó'}
+        {expanded ? 'Ocultar detalle' : 'Ver qué pasó'}
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
@@ -344,12 +368,32 @@ function EventCard({
           style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
         >
           <div className="overflow-hidden">
-            <EventChart event={event} thresholds={thresholds} />
+            <p className="mt-3 text-xs leading-relaxed text-muted">{eventExplanation(event)}</p>
+            <EventChart event={event} />
           </div>
         </div>
       )}
     </li>
   );
+}
+
+function eventExplanation(event: EventRecord): string {
+  const details = {
+    LOW_VOLTAGE: { value: event.minVoltage, unit: 'V', comparison: 'por debajo' },
+    HIGH_VOLTAGE: { value: event.maxVoltage, unit: 'V', comparison: 'por encima' },
+    OVERCURRENT: { value: event.maxCurrent, unit: 'A', comparison: 'por encima' },
+  };
+  const threshold = event.detectionThreshold;
+  const start = `Inicio registrado el ${formatDateTime(event.startedAt)}.`;
+  if (event.type === 'DATA_GAP') {
+    const limit = threshold == null ? 'El umbral histórico no está disponible.' : `El límite aplicado era de ${threshold} min.`;
+    return `Se registró un intervalo sin lecturas. ${limit} ${start}`;
+  }
+  const { value, unit, comparison } = details[event.type];
+  const limit = threshold == null ? 'El umbral histórico no está disponible.' : `La lectura quedó ${comparison} del umbral de ${formatNumber(threshold, 1)} ${unit}.`;
+  const measured = value == null ? '' : `Valor registrado: ${formatNumber(value, unit === 'A' ? 3 : 1)} ${unit}. `;
+  const state = event.endedAt === null ? 'El episodio sigue abierto.' : 'El detector cerró el episodio después de evaluar las lecturas posteriores.';
+  return `${measured}${limit} ${start} ${state}`;
 }
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -361,11 +405,7 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EmptyState({ filtered, loaded }: { filtered: boolean; loaded: boolean }) {
-  if (!loaded) {
-    return <p className="text-center text-sm text-muted py-16">Cargando eventos…</p>;
-  }
-
+function EmptyState({ filtered }: { filtered: boolean }) {
   return (
     <div className="rounded-2xl border border-border-soft bg-surface p-10 text-center">
       <ShieldCheck className="h-8 w-8 text-ok mx-auto mb-3" />
@@ -377,7 +417,7 @@ function EmptyState({ filtered, loaded }: { filtered: boolean; loaded: boolean }
       <p className="mt-1 text-xs text-muted">
         {filtered
           ? 'Probá ampliando el rango de fechas o cambiando el tipo.'
-          : 'La detección corre en cada ciclo del recolector. Que no haya eventos es una buena noticia.'}
+          : 'El historial se actualiza con cada evaluación de lecturas.'}
       </p>
     </div>
   );
